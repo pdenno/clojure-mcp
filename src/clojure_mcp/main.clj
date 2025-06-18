@@ -27,6 +27,8 @@
             [clojure-mcp.tools.project.tool :as project-tool]
             [clojure-mcp.tools.scratch-pad.tool :as scratch-pad-tool]))
 
+(def nrepl-client-atom (atom nil))
+
 ;; Define the resources you want available
 (defn my-resources [nrepl-client-map working-dir]
   (keep
@@ -66,22 +68,26 @@
 
 (declare code-review-prompt-example)
 
-(defn my-prompts [working-dir]
-  [{:name "clojure_repl_system_prompt"
-    :description "Provides instructions and guidelines for Clojure development, including style and best practices."
-    :arguments [] ;; No arguments needed for this prompt
-    :prompt-fn (prompts/simple-content-prompt-fn
-                "System Prompt: Clojure REPL"
-                (str
-                 (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_repl_form_edit.md")
-                 (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_form_edit.md")))}
-   (prompts/create-project-summary working-dir)
-   #_prompts/scratch-pad-guide
-   prompts/chat-session-summary
-   prompts/resume-chat-session
-   prompts/plan-and-execute
-   ;; Example parameterized prompt - code review - see function below
-   #_(code-review-prompt-example)])
+(defn my-prompts
+  ([working-dir]
+   (my-prompts working-dir nrepl-client-atom))
+  ([working-dir nrepl-client-atom]
+   [{:name "clojure_repl_system_prompt"
+     :description "Provides instructions and guidelines for Clojure development, including style and best practices."
+     :arguments [] ;; No arguments needed for this prompt
+     :prompt-fn (prompts/simple-content-prompt-fn
+                 "System Prompt: Clojure REPL"
+                 (str
+                  (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_repl_form_edit.md")
+                  (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_form_edit.md")))}
+    (prompts/create-project-summary working-dir)
+    #_prompts/scratch-pad-guide
+    prompts/chat-session-summary
+    prompts/resume-chat-session
+    prompts/plan-and-execute
+    (prompts/add-dir nrepl-client-atom)
+    ;; Example parameterized prompt - code review - see function below
+    #_(code-review-prompt-example)]))
 
 (defn my-tools [nrepl-client-atom]
   [;; read-only tools
@@ -117,7 +123,6 @@
    (code-critique-tool/code-critique-tool nrepl-client-atom)])
 
 ;; not sure if this is even needed
-(def nrepl-client-atom (atom nil))
 
 ;; start the server
 (defn start-mcp-server [nrepl-args]
@@ -127,7 +132,7 @@
         resources (my-resources nrepl-client-map working-dir)
         _ (reset! nrepl-client-atom nrepl-client-map)
         tools (my-tools nrepl-client-atom)
-        prompts (my-prompts working-dir)
+        prompts (my-prompts  working-dir nrepl-client-atom)
         mcp (core/mcp-server)]
     (doseq [tool tools]
       (core/add-tool mcp tool))
