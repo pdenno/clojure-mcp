@@ -6,7 +6,7 @@
    [clojure-mcp.tools.form-edit.core :as core]
    [clojure-mcp.utils.emacs-integration :as emacs]
    [clojure-mcp.utils.diff :as diff-utils]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.config :as config]
    [rewrite-clj.zip :as z]
    [rewrite-clj.parser :as p]

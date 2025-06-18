@@ -4,8 +4,8 @@
    smart tool that automatically selects the appropriate mode based on file type."
   (:require
    [clojure-mcp.tool-system :as tool-system]
-   [clojure-mcp.tools.read-file.core :as read-file-core]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.core :as read-file-core]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.tools.form-edit.core :as form-edit-core]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.tools.unified-read-file.pattern-core :as pattern-core]

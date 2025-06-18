@@ -4,7 +4,7 @@
    [clojure-mcp.tools.form-edit.tool :as sut]
    [clojure-mcp.tools.form-edit.pipeline :as pipeline]
    [clojure-mcp.tool-system :as tool-system]
-   [clojure-mcp.tools.read-file.file-timestamps :as file-timestamps]
+   [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.tools.test-utils :as test-utils]
    [clojure-mcp.config :as config] ; Added config require
    [clojure.java.io :as io]
