@@ -27,10 +27,8 @@
             [clojure-mcp.tools.project.tool :as project-tool]
             [clojure-mcp.tools.scratch-pad.tool :as scratch-pad-tool]))
 
-(def nrepl-client-atom (atom nil))
-
 ;; Define the resources you want available
-(defn my-resources [nrepl-client-map working-dir]
+(defn make-resources [nrepl-client-atom working-dir]
   (keep
    identity
    [(resources/create-file-resource
@@ -57,7 +55,7 @@
      "Guidelines for writing Clojure code for the current project hosting the REPL"
      "text/markdown"
      (str working-dir "/LLM_CODE_STYLE.md"))
-    (let [{:keys [outputs error]} (project/inspect-project nrepl-client-map)]
+    (let [{:keys [outputs error]} (project/inspect-project @nrepl-client-atom)]
       (when-not error
         (resources/create-string-resource
          "custom://project-info"
@@ -66,30 +64,22 @@
          "text/markdown"
          outputs)))]))
 
-(declare code-review-prompt-example)
+(defn make-prompts [nrepl-client-atom working-dir]
+  [{:name "clojure_repl_system_prompt"
+    :description "Provides instructions and guidelines for Clojure development, including style and best practices."
+    :arguments [] ;; No arguments needed for this prompt
+    :prompt-fn (prompts/simple-content-prompt-fn
+                "System Prompt: Clojure REPL"
+                (str
+                 (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_repl_form_edit.md")
+                 (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_form_edit.md")))}
+   (prompts/create-project-summary working-dir)
+   prompts/chat-session-summary
+   prompts/resume-chat-session
+   prompts/plan-and-execute
+   (prompts/add-dir nrepl-client-atom)])
 
-(defn my-prompts
-  ([working-dir]
-   (my-prompts working-dir nrepl-client-atom))
-  ([working-dir nrepl-client-atom]
-   [{:name "clojure_repl_system_prompt"
-     :description "Provides instructions and guidelines for Clojure development, including style and best practices."
-     :arguments [] ;; No arguments needed for this prompt
-     :prompt-fn (prompts/simple-content-prompt-fn
-                 "System Prompt: Clojure REPL"
-                 (str
-                  (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_repl_form_edit.md")
-                  (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_form_edit.md")))}
-    (prompts/create-project-summary working-dir)
-    #_prompts/scratch-pad-guide
-    prompts/chat-session-summary
-    prompts/resume-chat-session
-    prompts/plan-and-execute
-    (prompts/add-dir nrepl-client-atom)
-    ;; Example parameterized prompt - code review - see function below
-    #_(code-review-prompt-example)]))
-
-(defn my-tools [nrepl-client-atom]
+(defn make-tools [nrepl-client-atom working-directory]
   [;; read-only tools
    (directory-tree-tool/directory-tree-tool nrepl-client-atom)
    (unified-read-file-tool/unified-read-file-tool nrepl-client-atom)
@@ -122,26 +112,30 @@
    ;; experimental 
    (code-critique-tool/code-critique-tool nrepl-client-atom)])
 
+;; DEPRECATED but maintained for backword compatability
+(defn ^:deprecated my-prompts
+  ([working-dir]
+   (my-prompts working-dir core/nrepl-client-atom))
+  ([working-dir nrepl-client-atom]
+   (make-prompts nrepl-client-atom working-dir)))
+
+(defn ^:deprecated my-resources [nrepl-client-atom working-dir]
+  (make-resources nrepl-client-atom working-dir))
+
+(defn ^:deprecated my-tools [nrepl-client-atom]
+  (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)]
+    (make-tools nrepl-client-atom working-directory)))
+
+(defn start-mcp-server [opts]
+  (core/build-and-start-mcp-server
+   opts
+   {:make-tools-fn make-tools
+    :make-prompts-fn make-prompts
+    :make-resources-fn make-resources}))
+
 ;; not sure if this is even needed
 
 ;; start the server
-(defn start-mcp-server [nrepl-args]
-  ;; the nrepl-args are a map with :port :host :tls-keys-file]
-  (let [nrepl-client-map (core/create-and-start-nrepl-connection nrepl-args)
-        working-dir (config/get-nrepl-user-dir nrepl-client-map)
-        resources (my-resources nrepl-client-map working-dir)
-        _ (reset! nrepl-client-atom nrepl-client-map)
-        tools (my-tools nrepl-client-atom)
-        prompts (my-prompts  working-dir nrepl-client-atom)
-        mcp (core/mcp-server)]
-    (doseq [tool tools]
-      (core/add-tool mcp tool))
-    (doseq [resource resources]
-      (core/add-resource mcp resource))
-    (doseq [prompt prompts]
-      (core/add-prompt mcp prompt))
-    (swap! nrepl-client-atom assoc :mcp-server mcp)
-    nil))
 
 ;; Example parameterized prompt
 (defn code-review-prompt-example []
@@ -173,7 +167,3 @@
                            "Please use the read_file tool to examine the code, "
                            "then provide detailed feedback.")}]})))})
 
-;; -Djdk.attach.allowAttachSelf is needed on the nrepl server if you want the mcp-server eval tool
-;; to be able to interrupt long running evals
-
-;; TODO make a main fn that uses clojure.tools.cli and takes port host and tls-keys-file args
