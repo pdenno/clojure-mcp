@@ -11,8 +11,7 @@ The project has undergone a significant refactor to make creating custom MCP ser
 - **Code indexer tool** (`clojure -X:index`) for creating condensed codebase maps showing function signatures
 - **Reader conditional support** in collapsed view for `.cljc` files with platform-specific code
 - **Multi-tool support** in `glob_files` with intelligent fallback (ripgrep → find → Java NIO)
-- **Add-dir prompt** allowing AI to request adding directories to allowed paths
-- **Comprehensive test coverage** for project.clj parsing functions
+- **Add-dir prompt** allowing you to add directories to allowed paths
 
 ### Changed
 - **Project inspection tool** completely refactored for 97% reduction in nREPL payload by moving file operations to local execution
