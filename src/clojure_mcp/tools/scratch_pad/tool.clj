@@ -143,10 +143,10 @@ Viewing tasks:
                       :enum ["set_path" "get_path" "delete_path" "inspect"]
                       :description "The operation to perform either\n * set_path: set a value at a path\n * get_path: retrieve a value at a path\n * delete_path: remove the value at the path the data structure\n * inspect: view the datastructure (or a specific path within it) up to a certain depth"}
                 "path" {:type "array"
-                        :items {:type ["string" "number"]}
+                        :items {:type "string"  #_["string" "number"]}
                         :description "Path to the data location (array of string or number keys) this works for all operations including inspect"}
-                "value" {:description "Value to store (for set_path). Can be aany JSON value EXCEPT null: object, array, string, number, boolean."
-                         :type ["object" "array" "string" "number" "boolean"]}
+                "value" {:description "Value to store (for set_path). Can be ANY JSON value EXCEPT null: object, array, string, number, boolean."
+                         :type "object" #_["object" "array" "string" "number" "boolean"]}
                 "explanation" {:type "string"
                                :description "Explanation of why this operation is being performed"}
                 "depth" {:type "number"
