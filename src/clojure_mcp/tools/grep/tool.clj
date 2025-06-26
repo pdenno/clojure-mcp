@@ -26,15 +26,16 @@
   "Fast content search tool that works with any codebase size.
 - Searches file contents using regular expressions.
 - Supports full regex syntax (eg. \"log.*Error\", \"function\\s+\\w+\", etc.).
-- Filter files by pattern with the include parameter (eg. \"*.js\", \"*.{ts,tsx}\").
-- Returns matching file paths sorted by modification time.
-- Use this tool when you need to find files containing specific patterns.
+- When path is a directory: Returns matching file paths sorted by modification time.
+- When path is a file: Returns matching lines with line numbers.
+- Filter files by pattern with the include parameter (eg. \"*.js\", \"*.{ts,tsx}\") - only for directories.
+- Use this tool when you need to find files containing specific patterns or lines within a specific file.
 - When you are doing an open ended search that may require multiple rounds of globbing and grepping, use the `dispatch_agent` tool instead")
 
 (defmethod tool-system/tool-schema :grep [_]
   {:type :object
    :properties {:path {:type :string
-                       :description "The directory to search in. Defaults to the current working directory."}
+                       :description "The file or directory to search in. Defaults to the current working directory."}
                 :pattern {:type :string
                           :description "The regular expression pattern to search for in file contents"}
                 :include {:type :string
@@ -72,21 +73,45 @@
     {:result [(:error result)]
      :error true}
     ;; Otherwise, format the results in a human-readable way
-    (let [{:keys [filenames numFiles truncated]} result
-          output (cond
-                   (nil? filenames)
-                   "No files found"
+    (cond
+      ;; File search results (searching a directory)
+      (contains? result :filenames)
+      (let [{:keys [filenames numFiles truncated]} result]
+        {:result [(cond
+                    (nil? filenames)
+                    "No files found"
 
-                   (zero? numFiles)
-                   "No files found"
+                    (zero? numFiles)
+                    "No files found"
 
-                   :else
-                   (let [base-message (str "Found " numFiles " file" (when-not (= numFiles 1) "s") "\n"
-                                           (string/join "\n" filenames))]
-                     (if truncated
-                       (str base-message "\n(Results are truncated. Consider using a more specific path or pattern.)")
-                       base-message)))]
-      {:result [output]
+                    :else
+                    (let [base-message (str "Found " numFiles " file" (when-not (= numFiles 1) "s") "\n"
+                                            (string/join "\n" filenames))]
+                      (if truncated
+                        (str base-message "\n(Results are truncated. Consider using a more specific path or pattern.)")
+                        base-message)))]
+         :error false})
+
+      ;; Line search results (searching within a file)
+      (contains? result :lines)
+      (let [{:keys [lines numMatches]} result]
+        {:result [(cond
+                    (nil? lines)
+                    "No matches found"
+
+                    (zero? numMatches)
+                    "No matches found"
+
+                    :else
+                    (str "Found " numMatches " match" (when-not (= numMatches 1) "es") "\n"
+                         (string/join "\n"
+                                      (map #(str (:line-number %) ": " (:content %))
+                                           lines))))]
+         :error false})
+
+      ;; Fallback (shouldn't happen with current implementation)
+      :else
+      {:result ["Unknown result format"]
        :error false})))
 
 ;; Backward compatibility function that returns the registration map
