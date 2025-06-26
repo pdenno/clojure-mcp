@@ -3,10 +3,12 @@
    This namespace provides the implementation details for analyzing project structure."
   (:require
    [clojure.edn :as edn]
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure-mcp.nrepl :as mcp-nrepl]
    [clojure-mcp.config :as config]
-   [clojure-mcp.tools.glob-files.core :as glob])
+   [clojure-mcp.tools.glob-files.core :as glob]
+   [clojure.tools.logging :as log])
   (:import [java.io File]
            [java.nio.file Paths]))
 
@@ -173,22 +175,23 @@
             source-paths (extract-source-paths deps lein-config)
             test-paths (extract-test-paths deps lein-config)
             all-paths (concat source-paths test-paths)
+            all-paths (map #(str (io/file working-dir %)) all-paths)
             ;; Collect source files locally using glob-files
             source-files (->> (mapcat (fn [path]
-                                        (let [clj-files (glob/glob-files working-dir (str path "/**/*.clj") :max-results 1000)
-                                              cljs-files (glob/glob-files working-dir (str path "/**/*.cljs") :max-results 1000)
-                                              cljc-files (glob/glob-files working-dir (str path "/**/*.cljc") :max-results 1000)
-                                              bb-files (glob/glob-files working-dir (str path "/**/*.bb") :max-results 1000)
-                                              edn-files (glob/glob-files working-dir (str path "/**/*.edn") :max-results 1000)]
+                                        (let [clj-files (glob/glob-files path "**/*.clj" :max-results 1000)
+                                              cljs-files (glob/glob-files path "**/*.cljs" :max-results 1000)
+                                              cljc-files (glob/glob-files path "**/*.cljc" :max-results 1000)
+                                              bb-files (glob/glob-files path  "**/*.bb" :max-results 1000)
+                                              edn-files (glob/glob-files path "**/*.edn" :max-results 1000)]
                                           (concat (or (:filenames clj-files) [])
                                                   (or (:filenames cljs-files) [])
                                                   (or (:filenames cljc-files) [])
                                                   (or (:filenames bb-files) [])
                                                   (or (:filenames edn-files) []))))
                                       all-paths)
-                               ;; Convert absolute paths to relative paths
+                              ;; Convert absolute paths to relative paths
                               (map #(to-relative-path working-dir %))
-                               ;; Sort alphabetically for better browsability
+                              ;; Sort alphabetically for better browsability
                               sort)]
         (with-out-str
           (println "\nClojure Project Information:")
