@@ -5,7 +5,6 @@
    [clojure-mcp.tools.grep.core :as core]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.config :as config] ; Added config require
-   [clojure.data.json :as json]
    [clojure.string :as string]))
 
 ;; Factory function to create the tool configuration
@@ -24,18 +23,17 @@
 
 (defmethod tool-system/tool-description :grep [_]
   "Fast content search tool that works with any codebase size.
-- Searches file contents using regular expressions.
+- Finds the paths to files that have matching contents using regular expressions.
 - Supports full regex syntax (eg. \"log.*Error\", \"function\\s+\\w+\", etc.).
-- When path is a directory: Returns matching file paths sorted by modification time.
-- When path is a file: Returns matching lines with line numbers.
-- Filter files by pattern with the include parameter (eg. \"*.js\", \"*.{ts,tsx}\") - only for directories.
-- Use this tool when you need to find files containing specific patterns or lines within a specific file.
+- Filter files by pattern with the include parameter (eg. \"*.js\", \"*.{ts,tsx}\").
+- Returns matching file paths sorted by modification time.
+- Use this tool when you need to find files containing specific patterns.
 - When you are doing an open ended search that may require multiple rounds of globbing and grepping, use the `dispatch_agent` tool instead")
 
 (defmethod tool-system/tool-schema :grep [_]
   {:type :object
    :properties {:path {:type :string
-                       :description "The file or directory to search in. Defaults to the current working directory."}
+                       :description "The directory to search in. Defaults to the current working directory."}
                 :pattern {:type :string
                           :description "The regular expression pattern to search for in file contents"}
                 :include {:type :string
