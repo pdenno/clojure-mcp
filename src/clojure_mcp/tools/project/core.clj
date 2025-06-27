@@ -55,7 +55,7 @@
       (try
         (-> deps-file slurp edn/read-string)
         (catch Exception e
-          (println "Warning: Failed to read/parse deps.edn:" (.getMessage e))
+          (log/debug "Failed to read/parse deps.edn:" (.getMessage e))
           nil)))))
 
 (defn read-project-clj
@@ -67,7 +67,7 @@
       (try
         (-> project-file slurp read-string)
         (catch Exception e
-          (println "Warning: Failed to read/parse project.clj:" (.getMessage e))
+          (log/debug "Failed to read/parse project.clj:" (.getMessage e))
           nil)))))
 
 (defn parse-lein-config
@@ -83,7 +83,7 @@
                (map (fn [[k v]] [k v]))
                (into {})))))
     (catch Exception e
-      (println "Warning: Failed to parse project.clj config:" (.getMessage e))
+      (log/debug "Failed to parse project.clj config:" (.getMessage e))
       {})))
 
 (defn extract-lein-project-info
@@ -97,7 +97,7 @@
        :dependencies (get lein-config :dependencies [])
        :profiles (get lein-config :profiles {})})
     (catch Exception e
-      (println "Warning: Failed to extract project.clj details:" (.getMessage e))
+      (log/debug "Failed to extract project.clj details:" (.getMessage e))
       {:name "Unknown" :version "Unknown" :dependencies [] :profiles {}})))
 
 (defn extract-source-paths
@@ -116,7 +116,7 @@
                       ["src"]))
       :else ["src"])
     (catch Exception e
-      (println "Warning: Failed to extract source paths:" (.getMessage e))
+      (log/debug "Failed to extract source paths:" (.getMessage e))
       ["src"])))
 
 (defn extract-test-paths
@@ -135,7 +135,7 @@
                       ["test"]))
       :else ["test"])
     (catch Exception e
-      (println "Warning: Failed to extract test paths:" (.getMessage e))
+      (log/debug "Failed to extract test paths:" (.getMessage e))
       ["test"])))
 
 (defn determine-project-type
@@ -162,10 +162,10 @@
                (try
                  (edn/read-string runtime-data)
                  (catch Throwable e
-                   (println "Error parsing runtime data:" (ex-message e))
+                   (log/debug "Error parsing runtime data:" (ex-message e))
                    nil))]
       (when error
-        (println "Runtime error:" error))
+        (log/debug "Runtime error:" error))
 
       ;; Read and parse project files locally
       (let [deps (read-deps-edn working-dir)
@@ -181,7 +181,7 @@
                                         (let [clj-files (glob/glob-files path "**/*.clj" :max-results 1000)
                                               cljs-files (glob/glob-files path "**/*.cljs" :max-results 1000)
                                               cljc-files (glob/glob-files path "**/*.cljc" :max-results 1000)
-                                              bb-files (glob/glob-files path  "**/*.bb" :max-results 1000)
+                                              bb-files (glob/glob-files path "**/*.bb" :max-results 1000)
                                               edn-files (glob/glob-files path "**/*.edn" :max-results 1000)]
                                           (concat (or (:filenames clj-files) [])
                                                   (or (:filenames cljs-files) [])
