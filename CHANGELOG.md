@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.1.6-alpha] - 2025-06-30
+
+### Performance Improvements
+- **Optimized `clojure_inspect_project`** with ~3.8x speedup by reducing glob operations from 5 calls to 1 using brace expansion patterns
+- **Added ripgrep recommendation** to README prerequisites for better `grep` and `glob_files` performance
+
+### Fixed
+- **Issue #13**: Replaced external diff utility with native Java library (java-diff-utils) to eliminate shell command dependencies
+- **Project inspection file discovery** - Fixed issue where the tool was failing to find files in some configurations
+- **Grep tool** now properly handles file patterns
+- **Scratch pad schema** simplified to resolve issue #42, improving compatibility with tool description overrides
+
+### Internal
+- Added comprehensive test suite for diff.clj with 38 assertions covering edge cases
+- Removed debug printlns from codebase
+- Minor description revert for clarity
+
 ## [v0.1.5-alpha] - 2025-06-22
 
 ### Major Refactoring: Simplified Custom MCP Server Creation
