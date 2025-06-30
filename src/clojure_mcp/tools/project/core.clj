@@ -176,19 +176,12 @@
             test-paths (extract-test-paths deps lein-config)
             all-paths (concat source-paths test-paths)
             all-paths (map #(str (io/file working-dir %)) all-paths)
-            ;; Collect source files locally using glob-files
-            source-files (->> (mapcat (fn [path]
-                                        (let [clj-files (glob/glob-files path "**/*.clj" :max-results 1000)
-                                              cljs-files (glob/glob-files path "**/*.cljs" :max-results 1000)
-                                              cljc-files (glob/glob-files path "**/*.cljc" :max-results 1000)
-                                              bb-files (glob/glob-files path "**/*.bb" :max-results 1000)
-                                              edn-files (glob/glob-files path "**/*.edn" :max-results 1000)]
-                                          (concat (or (:filenames clj-files) [])
-                                                  (or (:filenames cljs-files) [])
-                                                  (or (:filenames cljc-files) [])
-                                                  (or (:filenames bb-files) [])
-                                                  (or (:filenames edn-files) []))))
-                                      all-paths)
+            ;; Collect source files locally using a single glob pattern
+            source-files (->> all-paths
+                              (mapcat (fn [path]
+                                        ;; Use a single glob pattern for all extensions
+                                        (let [result (glob/glob-files path "**/*.{clj,cljs,cljc,bb,edn}" :max-results 1000)]
+                                          (or (:filenames result) []))))
                               ;; Convert absolute paths to relative paths
                               (map #(to-relative-path working-dir %))
                               ;; Sort alphabetically for better browsability
@@ -243,20 +236,20 @@
           (let [limit 50
                 ;; Process raw file paths into proper namespace names
                 processed-namespaces (->> source-files
-                                          (filter #(or (.endsWith % ".clj")
-                                                       (.endsWith % ".cljs")
-                                                       (.endsWith % ".cljc")))
+                                          (filter #(or (str/ends-with? % ".clj")
+                                                       (str/ends-with? % ".cljs")
+                                                       (str/ends-with? % ".cljc")))
                                           (map (fn [file-path]
                                                  ;; Remove source path prefix from file path
                                                  (let [relative-path (reduce (fn [path src-path]
-                                                                               (if (.startsWith path (str src-path "/"))
+                                                                               (if (str/starts-with? path (str src-path "/"))
                                                                                  (.substring path (inc (count src-path)))
                                                                                  path))
                                                                              file-path
                                                                              all-paths)]
                                                    (-> relative-path
-                                                       (.replace "/" ".")
-                                                       (.replace "_" "-")
+                                                       (str/replace "/" ".")
+                                                       (str/replace "_" "-")
                                                        (str/replace #"\.(clj|cljs|cljc)$" "")))))
                                           ;; Sort namespaces alphabetically
                                           sort
