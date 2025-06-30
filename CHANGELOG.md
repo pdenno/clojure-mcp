@@ -3,11 +3,11 @@
 ## [v0.1.6-alpha] - 2025-06-30
 
 ### Performance Improvements
-- **Optimized `clojure_inspect_project`** with ~3.8x speedup by reducing glob operations from 5 calls to 1 using brace expansion patterns
+- **Optimized `clojure_inspect_project`** with ~3.8x speedup by reducing glob operations from 5 calls to 1 using brace expansion patterns 
 - **Added ripgrep recommendation** to README prerequisites for better `grep` and `glob_files` performance
 
 ### Fixed
-- **Issue #13**: Replaced external diff utility with native Java library (java-diff-utils) to eliminate shell command dependencies
+- **Issue #13**: Replaced external diff utility with native Java library (java-diff-utils) to eliminate shell command dependencies (Many thanks to @burinc for this!)
 - **Project inspection file discovery** - Fixed issue where the tool was failing to find files in some configurations
 - **Grep tool** now properly handles file patterns
 - **Scratch pad schema** simplified to resolve issue #42, improving compatibility with tool description overrides
