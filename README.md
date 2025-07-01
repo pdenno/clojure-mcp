@@ -44,7 +44,7 @@ it is.
 
 ## The Good News
 
-There is a story that Clojure developers may have come to believe. The
+There is a story that Clojure developers you may have come to believe. The
 story that LLMs are overwhelmingly trained on more mainstream
 languages and as a result those languages have the upper hand when it
 comes to LLM assisted coding. I'm here to tell you that this is just
@@ -148,7 +148,10 @@ While you *can* use these tools alongside Claude Code and other code assistants 
 
 Once you're comfortable with the Clojure MCP toolset, you can make informed decisions about whether to use it exclusively or integrate it with other code assistants and development tools based on your specific workflow needs.
 
+## Help and Community Resources
 
+The [#ai-assited-coding Channel the Clojurians Slack](https://clojurians.slack.com/archives/C068E9L5M2Q) is very active and where I spend a lot of time.
+The [ClojureMCP Wiki](https://github.com/bhauman/clojure-mcp/wiki) has info on various integrations and sandboxing.
 
 ## 📋 Installation
 
@@ -168,7 +171,8 @@ Setting up ClojureMCP can be challenging as it is currently in alpha and not opt
 1. **Configure nREPL**: Set up and verify an nREPL server on port `7888` in your project
 2. **Install ClojureMCP**: Add `clojure-mcp` to your `~/.clojure/deps.edn`
 3. **Configure MCP Client**: Set up `clojure-mcp` as an MCP server in Claude Desktop or other MCP clients
-
+4. **Install Riggrep (Optional)**: [ripgrep](https://github.com/BurntSushi/ripgrep#installation) is a smart, fast file search tool that respects `.gitignore`. 
+   
 > **Note**: This setup verifies that all components work together. You can customize specific configuration details (like port numbers) after confirming the basic setup works.
 
 ## Step 1: Configure Your Target Project's nREPL Connection
