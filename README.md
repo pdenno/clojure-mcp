@@ -150,8 +150,8 @@ Once you're comfortable with the Clojure MCP toolset, you can make informed deci
 
 ## Help and Community Resources
 
-The [#ai-assited-coding Channel the Clojurians Slack](https://clojurians.slack.com/archives/C068E9L5M2Q) is very active and where I spend a lot of time.
-The [ClojureMCP Wiki](https://github.com/bhauman/clojure-mcp/wiki) has info on various integrations and sandboxing.
+* The [#ai-assited-coding Channel the Clojurians Slack](https://clojurians.slack.com/archives/C068E9L5M2Q) is very active and where I spend a lot of time.
+* The [ClojureMCP Wiki](https://github.com/bhauman/clojure-mcp/wiki) has info on various integrations and sandboxing.
 
 ## 📋 Installation
 
