@@ -7,6 +7,7 @@
             [clojure.tools.logging :as log]
             [clojure-mcp.nrepl :as nrepl]
             [clojure-mcp.config :as config]
+            [clojure-mcp.dialects :as dialects]
             [clojure-mcp.file-content :as file-content])
   (:import [io.modelcontextprotocol.server.transport
             StdioServerTransportProvider]
@@ -253,36 +254,23 @@
               (log/info "nREPL client map created")
               (nrepl/start-polling nrepl-client-map)
               (log/info "Started polling nREPL"))
-          clj-env (nrepl/clojure-env? nrepl-client-map)]
+          ;; Detect environment type early
+          clj-env (nrepl/clojure-env? nrepl-client-map)
+          env-type (if clj-env :clj :unknown)]
 
-      (when clj-env
-        (log/debug "Loading necessary namespaces and helpers")
-        (nrepl/eval-code nrepl-client-map
-                         (str
-                          "(require 'clojure.repl)"
-                          "(require 'nrepl.util.print)")
-                         identity)
-        (nrepl/tool-eval-code nrepl-client-map (slurp (io/resource "clojure-mcp/repl_helpers.clj")))
-        (nrepl/tool-eval-code nrepl-client-map "(in-ns 'user)")
-        (log/debug "Required namespaces loaded"))
+      ;; Initialize environment based on type
+      (dialects/initialize-environment nrepl-client-map env-type)
+      (dialects/load-repl-helpers nrepl-client-map env-type)
+      (log/debug "Environment initialized")
 
-      (let [user-dir (if (or project-dir (nil? clj-env))
-                       (do
-                         (log/info "Using provided project-dir:" project-dir)
-                         (.getCanonicalPath (io/file project-dir)))
-                       (try
-                         (edn/read-string
-                          (nrepl/tool-eval-code
-                           nrepl-client-map
-                           "(System/getProperty \"user.dir\")"))
-                         (catch Exception e
-                           (log/warn e "Failed to get user.dir")
-                           nil)))]
-        (if user-dir
-          (log/info "Working directory set to:" user-dir)
-          (do
-            (log/warn "Could not determine working directory")
-            (throw (ex-info "No user directory!!" {}))))
+      ;; Get project directory using dialect-specific logic
+      (let [user-dir (dialects/fetch-project-directory nrepl-client-map env-type project-dir)]
+        (when-not user-dir
+          (log/warn "Could not determine working directory")
+          (throw (ex-info "No project directory!!" {})))
+        (log/info "Working directory set to:" user-dir)
+
+        ;; Load configuration and determine final env-type
         (let [client-with-config (assoc nrepl-client-map
                                         ::config/config
                                         (config/load-remote-config nrepl-client-map user-dir))]
@@ -292,14 +280,10 @@
               (log/info "Using nrepl-env-type from config file:"
                         (get-in client-with-config [::config/config :nrepl-env-type]))
               client-with-config)
-            ;; Otherwise, auto-detect if we're in a Clojure environment
-            (if clj-env
-              (do
-                (log/info "Detected Clojure environment:" clj-env)
-                client-with-config)
-              (do
-                (log/warn "Not in a Clojure environment - setting nrepl-env-type to :unknown")
-                (config/set-config* client-with-config :nrepl-env-type :unknown)))))))
+            ;; Otherwise, use the detected environment type
+            (do
+              (log/info "Using detected nrepl-env-type:" env-type)
+              (config/set-config* client-with-config :nrepl-env-type env-type))))))
     (catch Exception e
       (log/error e "Failed to create nREPL connection")
       (throw e))))
