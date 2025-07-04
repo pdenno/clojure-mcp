@@ -75,7 +75,7 @@
    Returns the nREPL client map unchanged."
   [nrepl-client-map nrepl-env-type]
   (log/debug "Initializing Clojure environment")
-  (let [init-exps (initialize-environment-exp nrepl-env-type)]
+  (when-let [init-exps (not-empty (initialize-environment-exp nrepl-env-type))]
     (doseq [exp init-exps]
       (nrepl/eval-code nrepl-client-map exp identity)))
   nrepl-client-map)
@@ -83,7 +83,7 @@
 (defn load-repl-helpers
   "Loads REPL helper functions appropriate for the environment."
   [nrepl-client-map nrepl-env-type]
-  (let [helper-exps (load-repl-helpers-exp nrepl-env-type)]
+  (when-let [helper-exps (not-empty (load-repl-helpers-exp nrepl-env-type))]
     (doseq [exp helper-exps]
       (nrepl/tool-eval-code nrepl-client-map exp)))
   nrepl-client-map)

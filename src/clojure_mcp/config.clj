@@ -15,7 +15,7 @@
       (log/warn "Bad file paths " (pr-str [dir path]))
       nil)))
 
-(defn process-remote-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt bash-over-nrepl nrepl-env-type] :as config} user-dir]
+(defn process-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt bash-over-nrepl nrepl-env-type] :as config} user-dir]
   (let [ud (io/file user-dir)]
     (assert (and (.isAbsolute ud) (.isDirectory ud)))
     (when (some? write-file-guard)
@@ -40,21 +40,25 @@
       (some? (:bash-over-nrepl config))
       (assoc :bash-over-nrepl (boolean (:bash-over-nrepl config)))
       (some? (:nrepl-env-type config))
-      (assoc :nrepl-env-type nrepl-env-type))))
+      (assoc :nrepl-env-type (:nrepl-env-type config)))))
 
-(defn load-remote-config [nrepl-client user-dir]
-  (let [remote-cfg-str
-        (nrepl/tool-eval-code
-         nrepl-client
-         (pr-str
-          '(do
-             (require '[clojure.java.io :as io])
-             (if-let [f (clojure.java.io/file "." ".clojure-mcp" "config.edn")]
-               (when (.exists f) (clojure.edn/read-string (slurp f)))))))
-        remote-config (try (edn/read-string remote-cfg-str)
-                           (catch Exception _ {}))
-        processed-config (process-remote-config remote-config user-dir)]
-    (log/info "Loaded remote-config:" remote-config)
+(defn load-config
+  "Loads configuration from .clojure-mcp/config.edn in the given directory.
+   Reads the file directly from the filesystem."
+  [cli-config-file user-dir]
+  (let [config-file (if cli-config-file
+                      (io/file cli-config-file)
+                      (io/file user-dir ".clojure-mcp" "config.edn"))
+        config (if (.exists config-file)
+                 (try
+                   (edn/read-string (slurp config-file))
+                   (catch Exception e
+                     (log/warn e "Failed to read config file:" (.getPath config-file))
+                     {}))
+                 {})
+        processed-config (process-config config user-dir)]
+    (log/info "Config file:" (.getPath config-file) "exists:" (.exists config-file))
+    (log/info "Raw config:" config)
     (log/info "Processed config:" processed-config)
     processed-config))
 
