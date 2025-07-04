@@ -339,17 +339,24 @@
 
 (def nrepl-client-atom (atom nil))
 
+(defn coerce-options [{:keys [project-dir] :as opts}]
+  (cond-> opts
+    (symbol? project-dir)
+    (assoc :project-dir (str project-dir))))
+
 (defn validate-options
   "Validates the options map for build-and-start-mcp-server.
    Throws an exception with spec explanation if validation fails."
   [opts]
-  (when-not (s/valid? ::nrepl-args opts)
-    (let [explanation (s/explain-str ::nrepl-args opts)]
-      (log/error "Invalid options:" explanation)
-      (throw (ex-info "Invalid options for MCP server"
-                      {:explanation explanation
-                       :spec-data (s/explain-data ::nrepl-args opts)}))))
-  opts)
+  (let [opts (coerce-options opts)]
+    (if-not (s/valid? ::nrepl-args opts)
+      (let [explanation (s/explain-str ::nrepl-args opts)]
+        (println "Invalid options:" explanation)
+        (log/error "Invalid options:" explanation)
+        (throw (ex-info "Invalid options for MCP server"
+                        {:explanation explanation
+                         :spec-data (s/explain-data ::nrepl-args opts)})))
+      opts)))
 
 (defn build-and-start-mcp-server
   "Builds and starts an MCP server with the provided configuration.
@@ -382,10 +389,9 @@
   [nrepl-args {:keys [make-tools-fn
                       make-prompts-fn
                       make-resources-fn]}]
-  ;; Validate the nrepl-args
-  (validate-options nrepl-args)
   ;; the nrepl-args are a map with :port and optional :host
-  (let [nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
+  (let [nrepl-args (validate-options nrepl-args)
+        nrepl-client-map (create-and-start-nrepl-connection nrepl-args)
         working-dir (config/get-nrepl-user-dir nrepl-client-map)
         _ (reset! nrepl-client-atom nrepl-client-map)
         resources (when make-resources-fn
