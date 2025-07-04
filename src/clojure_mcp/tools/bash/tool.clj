@@ -102,8 +102,14 @@ in the response to determine command success.")
 
 (defmethod tool-system/execute-tool :bash [{:keys [nrepl-client-atom nrepl-session]} inputs]
   (let [{:keys [command working-directory timeout-ms]} inputs
-        inputs-with-session (assoc inputs :session nrepl-session)]
-    (core/execute-bash-command-nrepl nrepl-client-atom inputs-with-session)))
+        nrepl-client @nrepl-client-atom
+        use-nrepl? (config/get-bash-over-nrepl nrepl-client)]
+    (if use-nrepl?
+      ;; Execute over nREPL with session
+      (let [inputs-with-session (assoc inputs :session nrepl-session)]
+        (core/execute-bash-command-nrepl nrepl-client-atom inputs-with-session))
+      ;; Execute locally
+      (core/execute-bash-command nrepl-client inputs))))
 
 (defmethod tool-system/format-results :bash [_ result]
   (let [{:keys [stdout stderr exit-code timed-out error]} result

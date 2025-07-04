@@ -54,6 +54,10 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/code_critique/`: Code quality feedback
 - `/src/clojure_mcp/tools/think/`: Reflective thinking tool for AI assistants
 - `/src/clojure_mcp/tools/bash/`: Shell command execution
+  - **NEW**: Uses a separate nREPL session for isolation
+  - Each bash tool instance creates its own session on initialization
+  - Commands execute in an isolated environment from the main REPL
+  - Supports both nREPL and local execution modes via config
 - `/src/clojure_mcp/tools/dispatch_agent/`: Agent dispatching for complex tasks
 - `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
 - `/src/clojure_mcp/tools/scratch_pad/`: Persistent scratch pad for inter-tool communication
@@ -139,13 +143,17 @@ your-project/
 - `cljfmt`: Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: `true`)
   - `true` - Applies cljfmt formatting to edited files (default behavior)
   - `false` - Disables formatting, preserving exact whitespace and formatting
+- `bash-over-nrepl`: Boolean flag to control bash command execution mode (default: `true`)
+  - `true` - Execute bash commands over nREPL connection (default behavior)
+  - `false` - Execute bash commands locally on the MCP server
 
 ### Example Configuration
 ```edn
 {:allowed-directories ["." "src" "test" "resources" "../sibling-project"]
  :emacs-notify false
  :write-file-guard :full-read
- :cljfmt true}
+ :cljfmt true
+ :bash-over-nrepl true}
 ```
 
 ### Path Resolution and Security
