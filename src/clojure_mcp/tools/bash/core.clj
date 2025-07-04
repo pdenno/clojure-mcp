@@ -141,7 +141,7 @@ EDN parsing failed: %s\nRaw result: %s"
          opts)))
 
 (defn execute-bash-command-nrepl
-  [nrepl-client-atom {:keys [command working-directory timeout-ms] :as args}]
+  [nrepl-client-atom {:keys [command working-directory timeout-ms session] :as args}]
   (let [timeout-ms (or timeout-ms default-timeout-ms)]
     (when-not (command-allowed? command)
       (throw (ex-info "Command not allowed due to security restrictions"
@@ -154,8 +154,9 @@ EDN parsing failed: %s\nRaw result: %s"
           eval-timeout-ms (+ 5000 timeout-ms)
           result (eval-core/evaluate-code
                   @nrepl-client-atom
-                  {:code clj-shell-code
-                   :timeout-ms eval-timeout-ms})
+                  (cond-> {:code clj-shell-code
+                           :timeout-ms eval-timeout-ms}
+                    session (assoc :session session)))
           output-map (into {} (:outputs result))
           inner-value (:value output-map)]
       (when (:error result)
