@@ -273,6 +273,30 @@ If you see output other than JSON-RPC messages, it's likely due to `clojure-mcp`
 - **Shared Filesystem**: Currently, the nREPL and MCP servers must run on the same machine as they assume a shared filesystem.
 - **Dependency Isolation**: Don't include `clojure-mcp` in your project's dependencies. It should run separately with its own deps. Always use `:deps` (not `:extra-deps`) in its alias.
 
+### Command-Line Arguments
+
+The MCP server accepts the following command-line arguments via `clojure -X:mcp`:
+
+| Argument | Type | Description | Default | Example |
+|----------|------|-------------|---------|---------|
+| `:port` | integer | nREPL server port to connect to | 7888 | `:port 7889` |
+| `:host` | string | nREPL server host | "localhost" | `:host "192.168.1.10"` |
+| `:project-dir` | string | Override the working directory (must exist) | Uses nREPL's user.dir | `:project-dir "/path/to/project"` |
+
+**Using `:project-dir`**:
+
+The `:project-dir` option allows you to specify the project root
+directory explicitly, which can be useful when the nREPL server is not
+a Clojure environment and thus ClojureMCP is unable to detect the
+project directory by evaluating `(System/getPRoperty "user-dir")`.
+
+Example with custom project directory:
+```bash
+$ clojure -X:mcp :port 7888 :project-dir "/Users/me/my-clojure-project"
+```
+
+This sets the working directory for all file operations and configuration loading to the specified path.
+
 ## Step 3: Configure Claude Desktop
 
 This is often the most challenging part—ensuring the application's launch environment has the correct PATH and environment variables.
@@ -302,7 +326,7 @@ Create or edit `~/Library/Application\ Support/Claude/claude_desktop_config.json
 
 ### Advanced Configuration Example
 
-If you need to source environment variables (like API keys):
+If you need to source environment variables (like API keys) or specify a custom project directory:
 
 ```json
 {
@@ -311,7 +335,7 @@ If you need to source environment variables (like API keys):
             "command": "/bin/sh",
             "args": [
                 "-c",
-                "source ~/.my-llm-api-keys.sh && PATH=/Users/username/.nix-profile/bin:$PATH && clojure -X:mcp :port 7888"
+                "source ~/.my-llm-api-keys.sh && PATH=/Users/username/.nix-profile/bin:$PATH && clojure -X:mcp :port 7888 :project-dir \"/path/to/project\""
             ]
         }
     }
