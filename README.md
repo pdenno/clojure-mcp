@@ -617,6 +617,12 @@ The default tools included in `main.clj` are organized by category to support di
 - **Helper Functions**: Built-in namespace and symbol exploration tools
 - **Multiple Expressions**: Evaluates and partitions multiple expressions
 
+#### Shell Commands (`bash`)
+- **Configurable Execution**: Can run over nREPL or locally based on config
+- **Session Isolation**: When using nREPL mode, runs in separate session to prevent REPL interference
+- **Output Truncation**: Consistent 8500 character limit with smart stderr/stdout allocation
+- **Path Security**: Validates filesystem paths against allowed directories
+
 #### Agent System (`dispatch_agent`)
 - **Autonomous Search**: Handles complex, multi-step exploration tasks
 - **Read-only Access**: Agents have read only tool access
@@ -689,6 +695,22 @@ Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: 
 - `true` - Best for maintaining consistent code style across your project
 - `false` - Useful when working with files that have specific formatting requirements or when you want to preserve manual formatting
 
+#### `bash-over-nrepl`
+Boolean flag to control bash command execution mode (default: `true`). This setting determines whether bash commands are executed over the nREPL connection or locally on the MCP server.
+
+**Available values:**
+- `true` (default) - Execute bash commands over nREPL connection with isolated session
+- `false` - Execute bash commands locally in the Clojure MCP server process
+
+**When to use each setting:**
+- `true` - Best for most development scenarios, as it allows you to only sandbox the nrepl server process
+- `false` - Useful when the nREPL server is not a Clojure process, i.e. CLJS, Babashka, Scittle
+
+**Technical details:**
+- When `true`, bash commands run in a separate nREPL session to prevent interference with your REPL state
+- Both modes apply consistent output truncation (8500 chars total, split between stdout/stderr)
+- Local execution may be faster for simple commands but requires the MCP server to have necessary tools installed
+
 #### `write-file-guard`
 Controls the file timestamp tracking behavior (default: `:full-read`). This setting determines when file editing is allowed based on read operations.
 
@@ -716,7 +738,8 @@ The timestamp tracking system prevents accidental overwrites when files are modi
                        "../sibling-project"]
  :emacs-notify false
  :write-file-guard :full-read
- :cljfmt true}
+ :cljfmt true
+ :bash-over-nrepl true}
 ```
 
 ### Configuration Details
@@ -748,7 +771,8 @@ The timestamp tracking system prevents accidental overwrites when files are modi
                        "docs"]
  :emacs-notify false
  :write-file-guard :full-read
- :cljfmt true}
+ :cljfmt true
+ :bash-over-nrepl true}
 ```
 
 #### Multi-Project Setup
@@ -759,7 +783,8 @@ The timestamp tracking system prevents accidental overwrites when files are modi
                        "/home/user/reference-code"]
  :emacs-notify false
  :write-file-guard :partial-read
- :cljfmt true}
+ :cljfmt true
+ :bash-over-nrepl true}
 ```
 
 #### Restricted Mode (Extra Security)
@@ -768,7 +793,8 @@ The timestamp tracking system prevents accidental overwrites when files are modi
                        "test"]
  :emacs-notify false
  :write-file-guard :full-read
- :cljfmt false}  ; Preserve original formatting
+ :cljfmt false        ; Preserve original formatting
+ :bash-over-nrepl false}  ; Use local execution only
 ```
 
 **Note**: Configuration is loaded when the MCP server starts. Restart the server after making configuration changes.
