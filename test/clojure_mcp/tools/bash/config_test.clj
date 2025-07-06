@@ -88,13 +88,13 @@
           user-dir (System/getProperty "user.dir")]
 
       ;; Test with true value
-      (let [processed (config/process-remote-config config-true user-dir)]
+      (let [processed (config/process-config config-true user-dir)]
         (is (= true (:bash-over-nrepl processed))))
 
       ;; Test with false value
-      (let [processed (config/process-remote-config config-false user-dir)]
+      (let [processed (config/process-config config-false user-dir)]
         (is (= false (:bash-over-nrepl processed))))
 
       ;; Test with nil/missing value - should not be in result
-      (let [processed (config/process-remote-config config-nil user-dir)]
+      (let [processed (config/process-config config-nil user-dir)]
         (is (not (contains? processed :bash-over-nrepl)))))))

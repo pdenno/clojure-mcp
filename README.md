@@ -44,7 +44,7 @@ it is.
 
 ## The Good News
 
-There is a story that Clojure developers you may have come to believe. The
+There is a story that Clojure developers may have come to believe. The
 story that LLMs are overwhelmingly trained on more mainstream
 languages and as a result those languages have the upper hand when it
 comes to LLM assisted coding. I'm here to tell you that this is just
@@ -658,7 +658,6 @@ The default tools included in `main.clj` are organized by category to support di
 - **Persistent Workspace**: Store structured data for planning and inter-tool communication
 - **Memory-Only by Default**: Data is stored in memory only and lost when session ends (default behavior)
 - **Optional File Persistence**: Enable to save data between sessions and server restarts
-- **Dual-Mode Configuration**: Configure persistence via config file or runtime tool operations
 - **Path-Based Operations**: Use `set_path`, `get_path`, `delete_path` for precise data manipulation
 - **JSON Compatibility**: Store any JSON-compatible data (objects, arrays, strings, numbers, booleans)
 
@@ -667,28 +666,6 @@ By default, the scratch pad operates in memory only. Data persists during the se
 
 **Enabling Persistence:**
 
-Option 1 - Runtime Configuration (Immediate Effect):
-```
-# Enable persistence via tool operation
-scratch_pad:
-  op: persistence_config
-  enabled: true
-  filename: "my_workspace.edn"  # optional, defaults to "scratch_pad.edn"
-  explanation: Enable persistence with custom filename
-
-# Check persistence status
-scratch_pad:
-  op: status
-  explanation: Check current persistence settings
-
-# Disable persistence (data remains in memory)
-scratch_pad:
-  op: persistence_config
-  enabled: false
-  explanation: Disable file persistence
-```
-
-Option 2 - Configuration File (On Startup):
 Add to `.clojure-mcp/config.edn`:
 ```edn
 {:scratch-pad-load true    ; false by default
@@ -699,9 +676,6 @@ Add to `.clojure-mcp/config.edn`:
 - Files are saved in `.clojure-mcp/` directory within your project
 - Changes are automatically saved when persistence is enabled
 - Corrupted files are handled gracefully with error reporting
-- Runtime configuration updates the config file for persistence across restarts
-
-
 
 ## 🔧 Customization
 
@@ -780,7 +754,7 @@ Boolean flag to control bash command execution mode (default: `true`). This sett
 - `false` - Useful when the nREPL server is not a Clojure process, i.e. CLJS, Babashka, Scittle
 
 **Technical details:**
-- When `true`, bash commands run in a separate nREPL session to prevent interference with your REPL state
+- When `true`, bash commands run in a separate nREPL session
 - Both modes apply consistent output truncation (8500 chars total, split between stdout/stderr)
 - Local execution may be faster for simple commands but requires the MCP server to have necessary tools installed
 
@@ -810,16 +784,11 @@ Boolean flag to enable/disable scratch pad persistence on startup (default: `fal
 - `false` - Best for temporary planning and session-only data
 - `true` - When you want data to persist across sessions and server restarts
 
-**Note:** This setting controls persistence at startup. You can also enable/disable persistence at runtime using the `persistence_config` operation.
-
 #### `scratch-pad-file`
 Filename for scratch pad persistence (default: `"scratch_pad.edn"`).
 
 **Configuration:**
 - Specifies the filename within `.clojure-mcp/` directory
-- Only used when `scratch-pad-load` is `true`
-- Can be modified at runtime using `persistence_config` operation
-- Runtime changes are saved to the config file for future sessions
 
 ### Example Configuration
 
