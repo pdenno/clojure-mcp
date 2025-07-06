@@ -195,6 +195,19 @@
                     (on-key :middleware #(deliver prom %))))
     (deref prom 400 nil)))
 
+(defn describe [service]
+  (let [prom (promise)]
+    (send-msg! service
+               (new-tool-message service {:op "describe"})
+               (->> identity
+                    (done #(deliver prom %))))
+    (deref prom 600 nil)))
+
+(defn clojure-env? [service]
+  (when-let [desc (describe service)]
+    (when (get-in desc [:versions :clojure])
+      (get desc :versions))))
+
 (defn send-input [{:keys [::state] :as service} input]
   (send-msg! service
              (new-message service {:op "stdin" :stdin (when input

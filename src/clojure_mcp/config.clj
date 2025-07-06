@@ -15,7 +15,7 @@
       (log/warn "Bad file paths " (pr-str [dir path]))
       nil)))
 
-(defn process-remote-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt bash-over-nrepl] :as config} user-dir]
+(defn process-remote-config [{:keys [allowed-directories emacs-notify write-file-guard cljfmt bash-over-nrepl nrepl-env-type] :as config} user-dir]
   (let [ud (io/file user-dir)]
     (assert (and (.isAbsolute ud) (.isDirectory ud)))
     (when (some? write-file-guard)
@@ -38,7 +38,9 @@
       (some? (:cljfmt config))
       (assoc :cljfmt (boolean (:cljfmt config)))
       (some? (:bash-over-nrepl config))
-      (assoc :bash-over-nrepl (boolean (:bash-over-nrepl config))))))
+      (assoc :bash-over-nrepl (boolean (:bash-over-nrepl config)))
+      (some? (:nrepl-env-type config))
+      (assoc :nrepl-env-type nrepl-env-type))))
 
 (defn load-remote-config [nrepl-client user-dir]
   (let [remote-cfg-str
@@ -96,6 +98,20 @@
       true ; Default to true when not specified
       (boolean value))))
 
+(defn get-nrepl-env-type
+  "Returns the nREPL environment type.
+   Defaults to :clj if not specified."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :nrepl-env-type)]
+    (if (nil? value)
+      :clj ; Default to :clj when not specified
+      value)))
+
+(defn clojure-env?
+  "Returns true if the nREPL environment is a Clojure environment."
+  [nrepl-client-map]
+  (= :clj (get-nrepl-env-type nrepl-client-map)))
+
 (defn write-guard?
   "Returns true if write-file-guard is enabled (not false).
    This means file timestamp checking is active."
@@ -108,7 +124,7 @@
   [nrepl-client-map]
   (let [value (get-config nrepl-client-map :scratch-pad-load)]
     (if (nil? value)
-      false ; Default to false when not specified
+      false                      ; Default to false when not specified
       (boolean value))))
 
 (defn get-scratch-pad-file
@@ -120,6 +136,16 @@
       "scratch_pad.edn" ; Default filename
       value)))
 
-(defn set-config! [nrepl-client-atom k v]
-  (swap! nrepl-client-atom assoc-in [::config k] v))
+(defn set-config*
+  "Sets a config value in a map. Returns the updated map.
+   This is the core function that set-config! uses."
+  [nrepl-client-map k v]
+  (assoc-in nrepl-client-map [::config k] v))
+
+(defn set-config!
+  "Sets a config value in an atom containing an nrepl-client map.
+   Uses set-config* to perform the actual update."
+  [nrepl-client-atom k v]
+  (swap! nrepl-client-atom set-config* k v))
+
 

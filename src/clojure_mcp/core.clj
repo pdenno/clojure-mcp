@@ -248,22 +248,25 @@
   (log/info "Creating nREPL connection with config:" initial-config)
   (try
     (let [nrepl-client-map (nrepl/create (dissoc initial-config :project-dir))
-          project-dir (:project-dir initial-config)]
-      (log/info "nREPL client map created")
-      (nrepl/start-polling nrepl-client-map)
-      (log/info "Started polling nREPL")
+          project-dir (:project-dir initial-config)
+          _ (do
+              (log/info "nREPL client map created")
+              (nrepl/start-polling nrepl-client-map)
+              (log/info "Started polling nREPL"))
+          clj-env (nrepl/clojure-env? nrepl-client-map)]
 
-      (log/debug "Loading necessary namespaces and helpers")
-      (nrepl/eval-code nrepl-client-map
-                       (str
-                        "(require 'clojure.repl)"
-                        "(require 'nrepl.util.print)")
-                       identity)
-      (nrepl/tool-eval-code nrepl-client-map (slurp (io/resource "clojure-mcp/repl_helpers.clj")))
-      (nrepl/tool-eval-code nrepl-client-map "(in-ns 'user)")
-      (log/debug "Required namespaces loaded")
+      (when clj-env
+        (log/debug "Loading necessary namespaces and helpers")
+        (nrepl/eval-code nrepl-client-map
+                         (str
+                          "(require 'clojure.repl)"
+                          "(require 'nrepl.util.print)")
+                         identity)
+        (nrepl/tool-eval-code nrepl-client-map (slurp (io/resource "clojure-mcp/repl_helpers.clj")))
+        (nrepl/tool-eval-code nrepl-client-map "(in-ns 'user)")
+        (log/debug "Required namespaces loaded"))
 
-      (let [user-dir (if project-dir
+      (let [user-dir (if (or project-dir (nil? clj-env))
                        (do
                          (log/info "Using provided project-dir:" project-dir)
                          (.getCanonicalPath (io/file project-dir)))
@@ -280,9 +283,23 @@
           (do
             (log/warn "Could not determine working directory")
             (throw (ex-info "No user directory!!" {}))))
-        (assoc nrepl-client-map
-               ::config/config
-               (config/load-remote-config nrepl-client-map user-dir))))
+        (let [client-with-config (assoc nrepl-client-map
+                                        ::config/config
+                                        (config/load-remote-config nrepl-client-map user-dir))]
+          ;; Check if nrepl-env-type is already set in config
+          (if (contains? (::config/config client-with-config) :nrepl-env-type)
+            (do
+              (log/info "Using nrepl-env-type from config file:"
+                        (get-in client-with-config [::config/config :nrepl-env-type]))
+              client-with-config)
+            ;; Otherwise, auto-detect if we're in a Clojure environment
+            (if clj-env
+              (do
+                (log/info "Detected Clojure environment:" clj-env)
+                client-with-config)
+              (do
+                (log/warn "Not in a Clojure environment - setting nrepl-env-type to :unknown")
+                (config/set-config* client-with-config :nrepl-env-type :unknown)))))))
     (catch Exception e
       (log/error e "Failed to create nREPL connection")
       (throw e))))
