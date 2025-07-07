@@ -78,7 +78,8 @@
    prompts/resume-chat-session
    prompts/plan-and-execute
    (prompts/add-dir nrepl-client-atom)
-   (prompts/scratch-pad-load nrepl-client-atom)])
+   (prompts/scratch-pad-load nrepl-client-atom)
+   (prompts/scratch-pad-save-as nrepl-client-atom)])
 
 (defn make-tools [nrepl-client-atom working-directory]
   [;; read-only tools
