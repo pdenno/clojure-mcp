@@ -23,6 +23,7 @@
   ([nrepl-client-atom {:keys [max-lines max-line-length]
                        :or {max-lines 2000
                             max-line-length 1000}}]
+   ;; TODO this is naive and is a problem for files that are just one line
    {:tool-type :unified-read-file
     :nrepl-client-atom nrepl-client-atom
     :max-lines max-lines

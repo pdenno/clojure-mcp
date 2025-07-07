@@ -1,14 +1,8 @@
 # Clojure MCP Project Summary
 
-## Project Status
-
-**⚠️ Alpha Software** - This project is in early development and rapidly evolving. While invaluable for Clojure development workflows, expect breaking changes, rough edges, and incomplete documentation. Community contributions are actively welcomed for bug reports, feature suggestions, documentation improvements, and code contributions.
-
 ## Project Overview
 
 Clojure MCP is a Model Context Protocol (MCP) server that enables AI assistants (like Claude) to interact directly with a Clojure REPL. It provides a collaborative, REPL-driven development workflow between humans and LLMs. The core philosophy is "tiny steps with high quality rich feedback" for effective development.
-
-**Recent Major Refactoring**: The project has been refactored to separate the core MCP API from its consumption, enabling easier customization and reuse. The new pattern uses factory functions (`make-tools`, `make-prompts`, `make-resources`) and a single entry point (`core/build-and-start-mcp-server`) for creating custom MCP servers.
 
 The project allows AI assistants to:
 - Evaluate Clojure code and see immediate results

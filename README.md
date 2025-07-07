@@ -371,6 +371,67 @@ If you continue to have issues, consider consulting with AI assistants (Claude, 
 See the [Wiki](https://github.com/bhauman/clojure-mcp/wiki) for
 information on setting up other MCP clients.
 
+## Working with ClojureScript (shadow-cljs)
+
+ClojureMCP works seamlessly with [shadow-cljs](https://github.com/thheller/shadow-cljs) for ClojureScript development. Here's how to set it up:
+
+### Quick Start
+
+1. **Start your shadow-cljs server** with an nREPL port:
+   ```bash
+   # Start shadow-cljs (it will use port 9000 by default, or configure in shadow-cljs.edn)
+   npx shadow-cljs watch app
+   ```
+
+2. **Configure Claude Desktop or other client** to connect to the the shadow-cljs nREPL port:
+
+   ```
+   {
+    "mcpServers": {
+        "clojure-mcp": {
+            "command": "/bin/sh",
+            "args": [
+                "-c",
+                "PATH=/opt/homebrew/bin:$PATH && clojure -X:mcp :port 9000"
+            ]
+        }
+     }
+   }
+   ```
+
+OR change the shadow port to 7888 (or whatever port you have configured) and leave your client config as is.
+   
+
+3. **Switch to ClojureScript REPL** in Claude Desktop:
+   
+   Once Claude Desktop is connected, prompt Claude to evaluate:
+   ```clojure
+   (shadow/repl :app)
+   ```
+   
+   Replace `:app` with your actual build ID from `shadow-cljs.edn`.
+
+4. **All set!** Now all `clojure_eval` calls will be routed to your ClojureScript REPL, allowing you to:
+   - Evaluate ClojureScript code
+   - Interact with your running application
+   - Use all ClojureMCP tools for ClojureScript development
+
+### Switching Back to Clojure
+
+To exit the ClojureScript REPL and return to Clojure, have Claude evaluate:
+```clojure
+:cljs/quit
+```
+
+### Tips for shadow-cljs Development
+
+- **Build Selection**: Use the appropriate build ID (`:app`, `:main`, `:test`, etc.) based on your `shadow-cljs.edn` configuration
+- **Hot Reload**: shadow-cljs hot reload continues to work normally while using ClojureMCP
+- **Browser Connection**: Ensure your browser is connected to shadow-cljs for browser-targeted builds
+- **Node.js Builds**: Works equally well with Node.js targeted builds
+
+This integration gives you the full power of ClojureMCP's REPL-driven development workflow for ClojureScript projects!
+
 ## Starting a new conversation
 
 Once everything is set up I'd suggest starting a new chat in Claude.
