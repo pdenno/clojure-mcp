@@ -27,20 +27,21 @@
   [result]
   (if (:error result)
     (:error result)
-    (let [{:keys [files directories full-path]} result]
-      (with-out-str
-        (println "Directory:" full-path)
-        (println "===============================")
-        (when (seq directories)
-          (println "\nDirectories:")
-          (doseq [dir (sort directories)]
-            (println "[DIR]" dir)))
-        (when (seq files)
-          (println "\nFiles:")
-          (doseq [file (sort files)]
-            (println "[FILE]" file)))
-        (when (and (empty? directories) (empty? files))
-          (println "Directory is empty"))))))
+    (let [{:keys [files directories full-path]} result
+          sb (StringBuilder.)]
+      (.append sb (str "Directory: " full-path "\n"))
+      (.append sb "===============================\n")
+      (when (seq directories)
+        (.append sb "\nDirectories:\n")
+        (doseq [dir (sort directories)]
+          (.append sb (str "[DIR] " dir "\n"))))
+      (when (seq files)
+        (.append sb "\nFiles:\n")
+        (doseq [file (sort files)]
+          (.append sb (str "[FILE] " file "\n"))))
+      (when (and (empty? directories) (empty? files))
+        (.append sb "Directory is empty\n"))
+      (.toString sb))))
 
 ;; Implement the required multimethods for the list-directory tool
 (defmethod tool-system/tool-name :list-directory [_]

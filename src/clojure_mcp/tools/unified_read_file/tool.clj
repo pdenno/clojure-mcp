@@ -266,4 +266,4 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
         tool (unified-read-file-tool (atom {:clojure-mcp.core/nrepl-user-dir user-dir
                                             :clojure-mcp.core/allowed-directories [user-dir]}))
         tool-fn (:tool-fn tool)]
-    (println (tool-fn nil {:path path2 :name_pattern "validates"} (fn [a b] [a b])))))
+    (tap> (pr-str (tool-fn nil {:path path2 :name_pattern "validates"} (fn [a b] [a b]))))))

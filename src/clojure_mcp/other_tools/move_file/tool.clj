@@ -85,7 +85,7 @@
   ;; Test running the tool-fn directly
   (def tool-fn (:tool-fn reg-map))
   (tool-fn nil {"source" "/tmp/test-source.txt" "destination" "/tmp/test-dest.txt"}
-           (fn [result error] (println "Result:" result "Error:" error)))
+           (fn [result error] (tap> (str "Result:" result "Error:" error))))
 
   ;; Clean up
   (clojure-mcp.nrepl/stop-polling @client-atom))
