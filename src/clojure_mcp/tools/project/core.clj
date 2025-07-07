@@ -181,90 +181,91 @@
                             ;; Convert absolute paths to relative paths
                             (map #(to-relative-path working-dir %))
                             ;; Sort alphabetically for better browsability
-                            sort)]
-      (with-out-str
-        (println "\nClojure Project Information:")
-        (println "==============================")
+                            sort)
+          sb (StringBuilder.)]
+      (.append sb "\nClojure Project Information:\n")
+      (.append sb "==============================\n")
 
-        (println "\nEnvironment:")
-        (println "• Working Directory:" working-dir)
-        (println "• Project Type:" project-type)
+      (.append sb "\nEnvironment:\n")
+      (.append sb (str "• Working Directory: " working-dir "\n"))
+      (.append sb (str "• Project Type: " project-type "\n"))
 
-        (when clojure-version
-          (println "• Clojure Version:" clojure-version))
+      (when clojure-version
+        (.append sb (str "• Clojure Version: " clojure-version "\n")))
 
-        (when java-version
-          (println "• Java Version:" java-version))
+      (when java-version
+        (.append sb (str "• Java Version: " java-version "\n")))
 
-        (println "\nSource Paths:")
-        (doseq [path source-paths]
-          (println "•" path))
+      (.append sb "\nSource Paths:\n")
+      (doseq [path source-paths]
+        (.append sb (str "• " path "\n")))
 
-        (println "\nTest Paths:")
-        (doseq [path test-paths]
-          (println "•" path))
+      (.append sb "\nTest Paths:\n")
+      (doseq [path test-paths]
+        (.append sb (str "• " path "\n")))
 
-        (when allowed-directories
-          (println "\nOther Relevant Accessible Directories:")
-          (doseq [dir allowed-directories]
-            (println "•" dir)))
+      (when allowed-directories
+        (.append sb "\nOther Relevant Accessible Directories:\n")
+        (doseq [dir allowed-directories]
+          (.append sb (str "• " dir "\n"))))
 
-        (when deps
-          (println "\nDependencies:")
-          (doseq [[dep coord] (sort-by key (:deps deps))]
-            (println "•" dep "=>" coord)))
+      (when deps
+        (.append sb "\nDependencies:\n")
+        (doseq [[dep coord] (sort-by key (:deps deps))]
+          (.append sb (str "• " dep " => " coord "\n"))))
 
-        (when-let [aliases (:aliases deps)]
-          (println "\nAliases:")
-          (doseq [[alias config] (sort-by key aliases)]
-            (println "•" alias ":" (pr-str config))))
+      (when-let [aliases (:aliases deps)]
+        (.append sb "\nAliases:\n")
+        (doseq [[alias config] (sort-by key aliases)]
+          (.append sb (str "• " alias " : " (pr-str config) "\n"))))
 
-        (when project-clj
-          (let [project-info (extract-lein-project-info project-clj lein-config)]
-            (println "\nLeiningen Project:")
-            (println "• Name:" (:name project-info))
-            (println "• Version:" (:version project-info))
-            (when-let [deps (:dependencies project-info)]
-              (println "\nLeiningen Dependencies:")
-              (doseq [[dep version] deps]
-                (println "•" dep "=>" version)))
-            (when-let [profiles (:profiles project-info)]
-              (println "\nLeiningen Profiles:")
-              (doseq [[profile config] (sort-by key profiles)]
-                (println "•" profile ":" (pr-str config))))))
+      (when project-clj
+        (let [project-info (extract-lein-project-info project-clj lein-config)]
+          (.append sb "\nLeiningen Project:\n")
+          (.append sb (str "• Name: " (:name project-info) "\n"))
+          (.append sb (str "• Version: " (:version project-info) "\n"))
+          (when-let [deps (:dependencies project-info)]
+            (.append sb "\nLeiningen Dependencies:\n")
+            (doseq [[dep version] deps]
+              (.append sb (str "• " dep " => " version "\n"))))
+          (when-let [profiles (:profiles project-info)]
+            (.append sb "\nLeiningen Profiles:\n")
+            (doseq [[profile config] (sort-by key profiles)]
+              (.append sb (str "• " profile " : " (pr-str config) "\n"))))))
 
-        (let [limit 50
-              ;; Process raw file paths into proper namespace names
-              processed-namespaces (->> source-files
-                                        (filter #(or (str/ends-with? % ".clj")
-                                                     (str/ends-with? % ".cljs")
-                                                     (str/ends-with? % ".cljc")))
-                                        (map (fn [file-path]
-                                               ;; Remove source path prefix from file path
-                                               (let [relative-path (reduce (fn [path src-path]
-                                                                             (if (str/starts-with? path (str src-path "/"))
-                                                                               (.substring path (inc (count src-path)))
-                                                                               path))
-                                                                           file-path
-                                                                           all-paths)]
-                                                 (-> relative-path
-                                                     (str/replace "/" ".")
-                                                     (str/replace "_" "-")
-                                                     (str/replace #"\.(clj|cljs|cljc)$" "")))))
-                                        ;; Sort namespaces alphabetically
-                                        sort
-                                        (into []))]
-          (println "\nNamespaces (" (count processed-namespaces) "):")
-          (doseq [ns-name (take limit processed-namespaces)]
-            (println "•" ns-name))
-          (when (> (count processed-namespaces) limit)
-            (println "• ... and" (- (count processed-namespaces) limit) "more"))
+      (let [limit 50
+            ;; Process raw file paths into proper namespace names
+            processed-namespaces (->> source-files
+                                      (filter #(or (str/ends-with? % ".clj")
+                                                   (str/ends-with? % ".cljs")
+                                                   (str/ends-with? % ".cljc")))
+                                      (map (fn [file-path]
+                                             ;; Remove source path prefix from file path
+                                             (let [relative-path (reduce (fn [path src-path]
+                                                                           (if (str/starts-with? path (str src-path "/"))
+                                                                             (.substring path (inc (count src-path)))
+                                                                             path))
+                                                                         file-path
+                                                                         all-paths)]
+                                               (-> relative-path
+                                                   (str/replace "/" ".")
+                                                   (str/replace "_" "-")
+                                                   (str/replace #"\.(clj|cljs|cljc)$" "")))))
+                                      ;; Sort namespaces alphabetically
+                                      sort
+                                      (into []))]
+        (.append sb (str "\nNamespaces (" (count processed-namespaces) "):\n"))
+        (doseq [ns-name (take limit processed-namespaces)]
+          (.append sb (str "• " ns-name "\n")))
+        (when (> (count processed-namespaces) limit)
+          (.append sb (str "• ... and " (- (count processed-namespaces) limit) " more\n")))
 
-          (println "\nProject Structure (" (count source-files) " files):")
-          (doseq [source-file (take limit source-files)]
-            (println "•" source-file))
-          (when (> (count source-files) limit)
-            (println "• ... and" (- (count source-files) limit) "more")))))))
+        (.append sb (str "\nProject Structure (" (count source-files) " files):\n"))
+        (doseq [source-file (take limit source-files)]
+          (.append sb (str "• " source-file "\n")))
+        (when (> (count source-files) limit)
+          (.append sb (str "• ... and " (- (count source-files) limit) " more\n"))))
+      (.toString sb))))
 
 (defn parse-nrepl-result [result]
   (try
