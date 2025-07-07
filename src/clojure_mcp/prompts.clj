@@ -3,7 +3,9 @@
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
             [pogonos.core :as pg]
-            [clojure-mcp.config :as config])) ; Added config require
+            [clojure-mcp.config :as config]
+            [clojure-mcp.tools.scratch-pad.tool :as scratch-pad]
+            [clojure-mcp.tools.scratch-pad.core :as scratch-pad-core]))
 
 (defn simple-content-prompt-fn
   "Returns a prompt-fn that ignores request arguments and returns
@@ -188,3 +190,48 @@ After doing this provide a very brief (8 lines) summary of where we are and then
                       :messages [{:role :assistant
                                   :content (format "Failed to normalize the path '%s'. Please check the path and try again."
                                                    dir-path)}]}))))})
+
+(defn scratch-pad-load [nrepl-client-atom]
+  {:name "scratch_pad_load"
+   :description "Loads a file into the scratch pad state. Returns status messages and a shallow inspect of the loaded data."
+   :arguments [{:name "file_path"
+                :description "Optional file path to load (relative paths are relative to .clojure-mcp/ directory)"
+                :required? false}]
+   :prompt-fn (fn [_ request-args clj-result-k]
+                (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
+                      file-path (get request-args "file_path")
+                      filename (if (str/blank? file-path)
+                                 (config/get-scratch-pad-file @nrepl-client-atom)
+                                 file-path)
+                      ;; Handle relative vs absolute paths
+                      file (if (and filename (.isAbsolute (io/file filename)))
+                             (io/file filename)
+                             (scratch-pad/scratch-pad-file-path working-directory filename))]
+                  (try
+                    ;; Load the file
+                    (if (.exists file)
+                      (let [data (clojure.edn/read-string (slurp file))
+                            ;; Update the scratch pad atom
+                            _ (scratch-pad/update-scratch-pad! nrepl-client-atom (constantly data))
+                            ;; Get shallow inspect of the data
+                            inspect-result (:result (scratch-pad-core/execute-inspect data 1 nil))]
+                        (clj-result-k
+                         {:description (str "Loaded scratch pad from: " (.getPath file))
+                          :messages [{:role :assistant
+                                      :content (format "Successfully loaded scratch pad from '%s'.\n\nShallow inspect of loaded data:\n%s"
+                                                       (.getPath file)
+                                                       (:tree inspect-result))}]}))
+                      ;; File doesn't exist
+                      (clj-result-k
+                       {:description (str "File not found: " (.getPath file))
+                        :messages [{:role :assistant
+                                    :content (format "The file '%s' does not exist. No data was loaded into the scratch pad."
+                                                     (.getPath file))}]}))
+                    (catch Exception e
+                      ;; Error loading or parsing file
+                      (clj-result-k
+                       {:description (str "Error loading file: " (.getMessage e))
+                        :messages [{:role :assistant
+                                    :content (format "Failed to load scratch pad from '%s'.\nError: %s\n\nThe file may be corrupted or contain invalid EDN data."
+                                                     (.getPath file)
+                                                     (.getMessage e))}]})))))})
