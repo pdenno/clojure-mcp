@@ -52,7 +52,8 @@
                    ;; For other patterns, search recursively 
                    ["rg" "--files" "--glob" pattern dir])]
     (log/debug "Using rg:" (str/join " " cmd-args))
-    (let [result (apply shell/sh cmd-args)
+    (let [result (shell/with-sh-dir dir
+                   (apply shell/sh cmd-args))
           exit-code (:exit result)]
       (if (or (zero? exit-code) (= exit-code 1)) ;; 1 means no matches, which is not an error
         (let [end-time (System/currentTimeMillis)
@@ -111,7 +112,8 @@
                        :else pattern)
         cmd-args ["find" dir "-name" find-pattern "-type" "f"]]
     (log/debug "Using find:" (str/join " " cmd-args))
-    (let [result (apply shell/sh cmd-args)
+    (let [result (shell/with-sh-dir dir
+                   (apply shell/sh cmd-args))
           exit-code (:exit result)]
       (if (zero? exit-code)
         (let [end-time (System/currentTimeMillis)
