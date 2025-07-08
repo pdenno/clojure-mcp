@@ -4,15 +4,13 @@
    smart tool that automatically selects the appropriate mode based on file type."
   (:require
    [clojure-mcp.tool-system :as tool-system]
-   [clojure-mcp.tools.unified-read-file.core :as read-file-core]
    [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
-   [clojure-mcp.tools.form-edit.core :as form-edit-core]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.tools.unified-read-file.pattern-core :as pattern-core]
+   [clojure-mcp.tools.unified-read-file.core :as core]
    [clojure-mcp.file-content :as file-content]
    [clojure-mcp.config :as config]
    [clojure.tools.logging :as log]
-   [clojure.java.io :as io]
    [clojure.string :as str]))
 
 ;; Factory function to create the tool configuration
@@ -62,6 +60,9 @@ For defmethod forms:
 - For vector dispatch values, use the exact pattern (e.g., \"dispatch-with-vector \\[:feet :inches\\]\")
 - For qualified/namespaced multimethod names, include the namespace (e.g., \"tool-system/validate-inputs :clojure-eval\")
 
+For text files (non-Clojure):
+- When `collapsed: true` and a pattern is provided (`content_pattern` or `name_pattern`), shows only lines matching the pattern with 10 lines of context before and after
+
 For all other file types:
 - Collapsed view will not be applied and will return the raw contents of the file
 
@@ -79,6 +80,10 @@ Example usage for defmethod forms:
 - Find specific dispatch values: `name_pattern: \"area :circle\"`
 - Find vector dispatch values: `name_pattern: \"convert-length \\\\[:feet :inches\\\\]\"`
 - Find namespace-qualified methods: `name_pattern: \"tool-system/validate-inputs\"`
+
+Example usage for text files:
+- Find error messages: `content_pattern: \"ERROR|WARN\"`
+- Find specific log entries: `content_pattern: \"\\\\[2024-01-15.*ERROR\\\\]\"`
 
 Non collapsed view mode respects these parameters:
 
@@ -141,7 +146,9 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
         is-clojure-file (clojure-file? path)
         ;; Get write-file-guard config if we have the atom
         write-file-guard (when nrepl-client-atom
-                           (config/get-write-file-guard @nrepl-client-atom))]
+                           (config/get-write-file-guard @nrepl-client-atom))
+        ;; For text files, we'll use content_pattern or name_pattern for matching
+        pattern-for-text (or content_pattern name_pattern)]
 
     (cond
       (and is-clojure-file collapsed)
@@ -161,6 +168,29 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
         (catch Exception e
           {:error true
            :message (.getMessage e)}))
+
+      ;; New case: text file with collapsed view and pattern
+      (and (file-content/text-file? path)
+           (not is-clojure-file)
+           collapsed
+           pattern-for-text)
+      (let [file-result (file-timestamps/read-file-with-timestamp
+                         nrepl-client-atom path 0 limit-val :max-line-length max-line-length)]
+        (if (:error file-result)
+          {:error true
+           :message (:error file-result)}
+          (let [text-view-result (core/generate-text-collapsed-view
+                                  (:content file-result)
+                                  pattern-for-text
+                                  10 ; context-before
+                                  10)] ; context-after
+            (if (:error text-view-result)
+              text-view-result
+              {:mode :text-collapsed
+               :content (:view text-view-result)
+               :path path
+               :pattern-info (:pattern-info text-view-result)
+               :error false}))))
 
       (or is-clojure-file (file-content/text-file? path))
       (let [result (file-timestamps/read-file-with-timestamp
@@ -231,6 +261,17 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
                         (str "File truncated (showing " line-count " of " size " lines)\n\n")))]
     [(str preamble "```" lang-hint "\n" content "\n```")]))
 
+(defn format-text-collapsed-view
+  "Formats text file collapsed view with markdown."
+  [content path pattern-info]
+  (let [{:keys [pattern match-count total-lines blocks-count]} pattern-info
+        preamble (str "# COLLAPSED VIEW: " path "\n"
+                      "Pattern: \"" pattern "\"\n"
+                      "Found " match-count " matches in " total-lines " lines"
+                      (when blocks-count (str ", showing " blocks-count " block(s)")) "\n"
+                      "*** `" path "`\n")]
+    [(str preamble "```\n" content "\n```")]))
+
 (defmethod tool-system/format-results :unified-read-file [{:keys [max-lines]} result]
   (if (:error result)
     {:result [(or (:message result) "Unknown error")]
@@ -240,6 +281,12 @@ By default, reads up to " max-lines " lines, truncating lines longer than " max-
       {:result (format-clojure-view (:content result)
                                     (:path result)
                                     (:pattern-info result))
+       :error false}
+
+      :text-collapsed
+      {:result (format-text-collapsed-view (:content result)
+                                           (:path result)
+                                           (:pattern-info result))
        :error false}
 
       :raw
