@@ -46,7 +46,7 @@
 
 (defn execute-bash-command
   [_ {:keys [command working-directory timeout-ms] :as args}]
-  (log/info "Using local bash command: " command)
+  (log/debug "Using local bash command: " command)
   (let [timeout-ms (or timeout-ms default-timeout-ms)
         ;; Use same truncation limit as nREPL for consistency
         truncation-limit (int (* nrepl/truncation-length 0.85))
@@ -167,6 +167,7 @@ EDN parsing failed: %s\nRaw result: %s"
 
 (defn execute-bash-command-nrepl
   [nrepl-client-atom {:keys [command working-directory timeout-ms session] :as args}]
+  (log/debug "Using nREPL bash command: " command)
   (let [timeout-ms (or timeout-ms default-timeout-ms)]
     (when-not (command-allowed? command)
       (throw (ex-info "Command not allowed due to security restrictions"

@@ -272,10 +272,7 @@
               (log/info "Started polling nREPL"))
           ;; Detect environment type early
           ;; TODO this needs to be sorted out
-          env-type (or cli-env-type
-                       (if (nrepl/clojure-env? nrepl-client-map)
-                         :clj
-                         :unknown))
+          env-type (dialects/detect-nrepl-env-type nrepl-client-map)
           nrepl-client-map-with-config (fetch-config nrepl-client-map
                                                      config-file
                                                      cli-env-type

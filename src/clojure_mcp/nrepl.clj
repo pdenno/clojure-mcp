@@ -203,11 +203,6 @@
                     (done #(deliver prom %))))
     (deref prom 600 nil)))
 
-(defn clojure-env? [service]
-  (when-let [desc (describe service)]
-    (when (get-in desc [:versions :clojure])
-      (get desc :versions))))
-
 (defn send-input [{:keys [::state] :as service} input]
   (send-msg! service
              (new-message service {:op "stdin" :stdin (when input

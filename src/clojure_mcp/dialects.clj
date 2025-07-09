@@ -18,6 +18,10 @@
   [_]
   "(System/getProperty \"user.dir\")")
 
+(defmethod fetch-project-directory-exp :bb
+  [_]
+  "(System/getProperty \"user.dir\")")
+
 (defmethod fetch-project-directory-exp :default
   [_]
   nil)
@@ -32,6 +36,10 @@
   [_]
   ["(require 'clojure.repl)"
    "(require 'nrepl.util.print)"])
+
+(defmethod initialize-environment-exp :bb
+  [_]
+  ["(require 'clojure.repl)"])
 
 (defmethod initialize-environment-exp :default
   [_]
@@ -87,6 +95,13 @@
     (doseq [exp helper-exps]
       (nrepl/tool-eval-code nrepl-client-map exp)))
   nrepl-client-map)
+
+(defn detect-nrepl-env-type [nrepl-client-map]
+  (when-let [{:keys [versions]} (nrepl/describe nrepl-client-map)]
+    (cond
+      (get versions :clojure) :clj
+      (get versions :babashka) :bb
+      :else :unknown)))
 
 ;; Future dialect support placeholders
 (comment
