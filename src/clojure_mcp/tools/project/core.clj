@@ -31,20 +31,6 @@
       ;; Fallback to original path if relativization fails
       file-path)))
 
-(defn inspect-project-code
-  "Minimal REPL expression to gather only essential runtime information.
-   All file reading and parsing is now done locally."
-  []
-  ;; this expression is focussed on Clojure java runtime...
-  ;; this expression is expected to fail on environments like
-  ;; Babashka, Scittle and Basilisp
-  '(try
-     {:java-version (System/getProperty "java.version")
-      :clojure-version (try (clojure-version)
-                            (catch Exception _ nil))}
-     (catch Exception e
-       {:error (str "Failed to gather runtime info: " (.getMessage e))})))
-
 (defn read-deps-edn
   "Safely reads and parses deps.edn from the working directory.
    Returns the parsed EDN data or nil if file doesn't exist or parsing fails."
@@ -68,6 +54,18 @@
         (catch Exception e
           (log/debug "Failed to read/parse project.clj:" (.getMessage e))
           nil)))))
+
+(defn read-bb-edn
+  "Safely reads and parses bb.edn from the working directory.
+   Returns the parsed EDN data or nil if file doesn't exist or parsing fails."
+  [working-dir]
+  (let [bb-file (File. working-dir "bb.edn")]
+    (try
+      (when (.exists bb-file)
+        (edn/read-string (slurp bb-file)))
+      (catch Exception e
+        (log/warn "Failed to read or parse bb.edn:" (.getMessage e))
+        nil))))
 
 (defn parse-lein-config
   "Extracts configuration map from a parsed project.clj structure.
@@ -99,12 +97,28 @@
       (log/debug "Failed to extract project.clj details:" (.getMessage e))
       {:name "Unknown" :version "Unknown" :dependencies [] :profiles {}})))
 
+(defn extract-bb-source-paths
+  "Extracts source paths from bb.edn configuration."
+  [bb-config]
+  (when bb-config
+    (or (:paths bb-config) [])))
+
+(defn extract-bb-tasks
+  "Extracts tasks from bb.edn configuration."
+  [bb-config]
+  (when bb-config
+    (:tasks bb-config)))
+
 (defn extract-source-paths
-  "Extracts source paths from deps.edn or leiningen config.
+  "Extracts source paths from deps.edn, leiningen config, or bb.edn.
    Returns a vector of valid string paths, defaulting to [\"src\"]."
-  [deps lein-config]
+  [deps lein-config bb-config]
   (try
     (cond
+      bb-config (let [paths (extract-bb-source-paths bb-config)]
+                  (if (and paths (sequential? paths) (every? string? paths))
+                    paths
+                    ["src"]))
       deps (let [paths (:paths deps)]
              (if (and paths (sequential? paths) (every? string? paths))
                paths
@@ -121,7 +135,7 @@
 (defn extract-test-paths
   "Extracts test paths from deps.edn or leiningen config.
    Returns a vector of valid string paths, defaulting to [\"test\"]."
-  [deps lein-config]
+  [deps lein-config bb-config]
   (try
     (cond
       deps (let [paths (get-in deps [:aliases :test :extra-paths])]
@@ -138,9 +152,13 @@
       ["test"])))
 
 (defn determine-project-type
-  "Determines the project type based on presence of deps.edn and project.clj."
-  [deps project-clj]
+  "Determines the project type based on presence of deps.edn, project.clj, and bb.edn."
+  [deps project-clj bb-config]
   (cond
+    (and deps project-clj bb-config) "deps.edn + Leiningen + Babashka"
+    (and deps bb-config) "deps.edn + Babashka"
+    (and project-clj bb-config) "Leiningen + Babashka"
+    bb-config "Babashka"
     (and deps project-clj) "deps.edn + Leiningen"
     deps "deps.edn"
     project-clj "Leiningen"
@@ -154,20 +172,22 @@
    - runtime-data: The minimal runtime data from nREPL as an EDN string
    - allowed-directories: list of allowed directories
    - working-directory: the working directory of the project
+   - nrepl-env-type: the nrepl env type :clj, :bb, :unknown
    Returns a formatted string with project details"
-  [runtime-data allowed-directories working-dir]
+  [runtime-data allowed-directories working-dir nrepl-env-type]
   {:pre [working-dir (not-empty allowed-directories)]}
   ;; the Formatting code below should work even if we are unable to get data from
   ;; the nREPL connection
-  (let [{:keys [clojure-version java-version]} runtime-data]
+  (let [{:keys [clojure java babashka]} runtime-data]
 
     ;; Read and parse project files locally
     (let [deps (read-deps-edn working-dir)
+          bb-config (when babashka (read-bb-edn working-dir))
           project-clj (read-project-clj working-dir)
           lein-config (when project-clj (parse-lein-config project-clj))
-          project-type (determine-project-type deps project-clj)
-          source-paths (extract-source-paths deps lein-config)
-          test-paths (extract-test-paths deps lein-config)
+          project-type (determine-project-type deps project-clj bb-config)
+          source-paths (extract-source-paths deps lein-config bb-config)
+          test-paths (extract-test-paths deps lein-config bb-config)
           ;; validate all paths are in allowed directories and the working directory
           all-paths (->> (concat source-paths test-paths)
                          (keep #(try (vpaths/validate-path % working-dir allowed-directories)
@@ -190,11 +210,15 @@
       (.append sb (str "• Working Directory: " working-dir "\n"))
       (.append sb (str "• Project Type: " project-type "\n"))
 
-      (when clojure-version
-        (.append sb (str "• Clojure Version: " clojure-version "\n")))
+      (when clojure
+        (.append sb (str "• Clojure Version: " clojure "\n")))
 
-      (when java-version
-        (.append sb (str "• Java Version: " java-version "\n")))
+      (when java
+        (.append sb (str "• Java Version: " java "\n")))
+
+      (when babashka
+        (.append sb (str "• Babashka Version: " babashka "\n"))
+        (.append sb "• Note: This is a Babashka project\n"))
 
       (.append sb "\nSource Paths:\n")
       (doseq [path source-paths]
@@ -218,6 +242,14 @@
         (.append sb "\nAliases:\n")
         (doseq [[alias config] (sort-by key aliases)]
           (.append sb (str "• " alias " : " (pr-str config) "\n"))))
+
+      (when bb-config
+        (when-let [tasks (extract-bb-tasks bb-config)]
+          (.append sb "\nBabashka Tasks:\n")
+          (doseq [[task-name task-config] (sort-by key (dissoc tasks :requires))]
+            (let [doc (:doc task-config)
+                  task-desc (if doc (str task-name " - " doc) (str task-name))]
+              (.append sb (str "• " task-desc "\n"))))))
 
       (when project-clj
         (let [project-info (extract-lein-project-info project-clj lein-config)]
@@ -280,6 +312,14 @@
       (log/debug "Error parsing runtime data:" (ex-message e))
       nil)))
 
+(defn format-describe [{:keys [versions]}]
+  (if (:babashka versions)
+    (select-keys versions [:babashka])
+    (->> versions
+         (map (fn [[k {:keys [version-string]}]]
+                [k version-string]))
+         (into {}))))
+
 (defn inspect-project
   "Core function to inspect a Clojure project and return formatted information.
    Now uses minimal nREPL calls and does all file processing locally.
@@ -289,22 +329,18 @@
 
    Returns a map with :outputs (containing the formatted project info) and :error (boolean)"
   [nrepl-client]
-  (let [runtime-code (str (inspect-project-code))
-        result-promise (promise)
-        allowed-directories (config/get-allowed-directories nrepl-client)
-        working-directory (config/get-nrepl-user-dir nrepl-client)]
+  (let [allowed-directories (config/get-allowed-directories nrepl-client)
+        working-directory (config/get-nrepl-user-dir nrepl-client)
+        nrepl-env-type (config/get-nrepl-env-type nrepl-client)]
     (try
-      (let [formatted-info (-> (mcp-nrepl/tool-eval-code nrepl-client runtime-code)
-                               parse-nrepl-result
-                               (format-project-info allowed-directories working-directory))]
-        (deliver result-promise
-                 {:outputs [formatted-info]
-                  :error false}))
+      (when-let [formatted-info (some-> (mcp-nrepl/describe nrepl-client)
+                                        format-describe
+                                        (format-project-info allowed-directories working-directory nrepl-env-type))]
+        {:outputs [formatted-info]
+         :error false})
       (catch Exception e
-        (deliver result-promise
-                 {:outputs [(str "Exception during project inspection: " (.getMessage e))]
-                  :error true})))
-    @result-promise))
+        {:outputs [(str "Exception during project inspection: " (.getMessage e))]
+         :error true}))))
 
 (comment
   ;; Test the project inspection in the REPL
