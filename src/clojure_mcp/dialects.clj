@@ -8,6 +8,9 @@
             [clojure.tools.logging :as log]
             [clojure-mcp.nrepl :as nrepl]))
 
+(defn handle-bash-over-nrepl? [nrepl-env-type]
+  (boolean (#{:clj :bb} nrepl-env-type)))
+
 ;; Multimethod for getting the expression to fetch project directory
 (defmulti fetch-project-directory-exp
   "Returns an expression (string) to evaluate for getting the project directory.
@@ -22,6 +25,10 @@
   [_]
   "(System/getProperty \"user.dir\")")
 
+(defmethod fetch-project-directory-exp :basilisp
+  [_]
+  "(import os)\n(os/getcwd)")
+
 (defmethod fetch-project-directory-exp :default
   [_]
   nil)
@@ -34,12 +41,16 @@
 
 (defmethod initialize-environment-exp :clj
   [_]
-  ["(require 'clojure.repl)"
+  ["(require '[clojure.repl :as repl])"
    "(require 'nrepl.util.print)"])
 
 (defmethod initialize-environment-exp :bb
   [_]
-  ["(require 'clojure.repl)"])
+  ["(require '[clojure.repl :as repl])"])
+
+(defmethod initialize-environment-exp :basilisp
+  [_]
+  ["(require '[basilisp.repl :as repl])"])
 
 (defmethod initialize-environment-exp :default
   [_]
@@ -101,16 +112,11 @@
     (cond
       (get versions :clojure) :clj
       (get versions :babashka) :bb
+      (get versions :basilisp) :basilisp
       :else :unknown)))
 
 ;; Future dialect support placeholders
 (comment
-  ;; Babashka might have different initialization
-  (defmethod initialize-environment-exp :bb
-    [_]
-    ["(require '[babashka.fs :as fs])"
-     "(require '[clojure.repl])"])
-
   ;; ClojureScript on Node
   (defmethod fetch-project-directory-exp :cljs-node
     [_]
@@ -119,9 +125,4 @@
   ;; Jank might have C++ interop
   (defmethod fetch-project-directory-exp :jank
     [_]
-    "(jank.native/cwd)")
-
-  ;; Basilisp (Python-based)
-  (defmethod fetch-project-directory-exp :basilisp
-    [_]
-    "(python/os.getcwd)"))
+    "(jank.native/cwd)"))

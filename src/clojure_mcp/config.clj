@@ -1,7 +1,7 @@
 (ns clojure-mcp.config
   (:require
    [clojure.java.io :as io]
-   [clojure-mcp.nrepl :as nrepl]
+   [clojure-mcp.dialects :as dialects]
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]))
 
@@ -93,15 +93,6 @@
               (log/warn "Invalid write-file-guard value:" value "- using default :full-read")
               :full-read))))
 
-(defn get-bash-over-nrepl
-  "Returns whether bash commands should be executed over nREPL.
-   Defaults to true for compatibility."
-  [nrepl-client-map]
-  (let [value (get-config nrepl-client-map :bash-over-nrepl)]
-    (if (nil? value)
-      true ; Default to true when not specified
-      (boolean value))))
-
 (defn get-nrepl-env-type
   "Returns the nREPL environment type.
    Defaults to :clj if not specified."
@@ -110,6 +101,19 @@
     (if (nil? value)
       :clj ; Default to :clj when not specified
       value)))
+
+(defn get-bash-over-nrepl
+  "Returns whether bash commands should be executed over nREPL.
+   Defaults to true for compatibility."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :bash-over-nrepl)
+        nrepl-env-type (get-nrepl-env-type nrepl-client-map)]
+    ;; XXX hack so that bash still works in other environments
+    (if (nil? value)
+      ;; default to the capability
+      (dialects/handle-bash-over-nrepl? nrepl-env-type)
+      ;; respect configured value
+      (boolean value))))
 
 (defn clojure-env?
   "Returns true if the nREPL environment is a Clojure environment."

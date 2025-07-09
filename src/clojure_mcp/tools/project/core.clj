@@ -179,8 +179,7 @@
   {:pre [working-dir (not-empty allowed-directories)]}
   ;; the Formatting code below should work even if we are unable to get data from
   ;; the nREPL connection
-  (let [{:keys [clojure java babashka]} runtime-data]
-
+  (let [{:keys [clojure java babashka basilisp python]} runtime-data]
     ;; Read and parse project files locally
     (let [deps (read-deps-edn working-dir)
           bb-config (when babashka (read-bb-edn working-dir))
