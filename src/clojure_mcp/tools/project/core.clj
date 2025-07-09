@@ -100,8 +100,9 @@
 (defn extract-bb-source-paths
   "Extracts source paths from bb.edn configuration."
   [bb-config]
-  (when bb-config
-    (or (:paths bb-config) [])))
+  (if bb-config
+    (or (:paths bb-config) [])
+    []))
 
 (defn extract-bb-tasks
   "Extracts tasks from bb.edn configuration."

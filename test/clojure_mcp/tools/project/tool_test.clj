@@ -86,7 +86,7 @@
                        :sources ["/test/dir/src/test/core.clj"]}
           allowed-dirs ["/test/dir"]
           working-dir "/test/dir"
-          formatted (core/format-project-info sample-data allowed-dirs working-dir)]
+          formatted (core/format-project-info sample-data allowed-dirs working-dir :clj)]
       (is (string? formatted) "Should return a formatted string")
       (is (.contains formatted "Clojure Project Information") "Should contain project info header")
       (is (.contains formatted "Environment:") "Should contain environment section")
