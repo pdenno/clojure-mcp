@@ -1,20 +1,18 @@
-# Clojure MCP - REPL-Driven Development with AI Assistance
+# Clojure MCP: REPL-Driven Development with AI Assistance
 
 > **⚠️ Alpha Software - Work in Progress**
-> 
-> This project is in early development and rapidly evolving. While I've found it invaluable for working with Clojure projects and it has significantly improved my development workflow, expect breaking changes, rough edges, and incomplete documentation.
-> 
-> **🤝 Help Wanted!** If you find this useful, please consider contributing:
-> - Report bugs and issues you encounter
-> - Suggest improvements or new features
-> - Submit pull requests for fixes or enhancements
-> - Share your configuration patterns and workflows
-> - Help improve documentation and examples
-> 
-> Your feedback and contributions will help make this tool better for the entire Clojure community!
 
-A Model Context Protocol (MCP) server for Clojure that provides a
-complete set of tools to aid in the development of Clojure projects.
+Clojure MCP connects AI models to your Clojure development
+environment, enabling a remarkable REPL-driven development experience
+powered by large language models (LLMs).
+
+## 🚀 Quick Overview
+
+Clojure MCP transforms LLMs into:
+
+* Powerful Clojure Coding assistants.
+* Powerful Clojure REPL assistants: Rapid evaluation, debugging, and iteration.
+* Clojure-aware editors: Syntax-aware editing, auto-linting, and paren balancing.
 
 ## TLDR: what does this all mean for me?
 
@@ -117,12 +115,13 @@ Clojure nREPL, and Specialized Clojure editing tools enabling a unique
 Clojure develop experience.
 
 Clojure MCP provides a superset of the tools that Claude Code uses,
-so you can use it to work on Clojure **without any other tools**.  I
-highly recommend using it with Claude Desktop to start.  It's
-more attractive and there are **no api charges!**. Claude Desktop, also let's you
-have quick access to **your own prompts** and other resources provided
-by the clojure-mcp server. Having a stack of your own prompts
-available in a UI menu is very convenient.
+so you can use it to work on Clojure **without any other tools**.
+
+I highly recommend using ClojureMCP with Claude Desktop to start.
+It's more attractive and there are **no api charges!**. Claude
+Desktop, also let's you have quick access to **your own prompts** and
+other resources provided by the clojure-mcp server. Having a stack of
+your own prompts available in a UI menu is very convenient.
 
 Claude Desktop also let's you see the complete reasoning and tool
 execution chain which is very helpful for understanding how the LLM
@@ -248,8 +247,6 @@ Setting up ClojureMCP can be challenging as it is currently in alpha and not opt
 ## Step 1: Configure Your Target Project's nREPL Connection
 
 In the Clojure project where you want AI assistance, you'll need to ensure you can start an nREPL server on port `7888` (you can use any port).
-
-
 
 ### For deps.edn Projects
 
