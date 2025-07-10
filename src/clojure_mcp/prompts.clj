@@ -145,7 +145,7 @@ After doing this provide a very brief (8 lines) summary of where we are and then
                                                  session-key)}]})))})
 
 (defn add-dir [nrepl-client-atom]
-  {:name "add-dir"
+  {:name "ACT/add-dir"
    :description "Adds a directory to the allowed-directories list, giving the LLM access to it"
    :arguments [{:name "directory"
                 :description "Directory path to add (can be relative or absolute)"
@@ -192,7 +192,7 @@ After doing this provide a very brief (8 lines) summary of where we are and then
                                                    dir-path)}]}))))})
 
 (defn scratch-pad-load [nrepl-client-atom]
-  {:name "scratch_pad_load"
+  {:name "ACT/scratch_pad_load"
    :description "Loads a file into the scratch pad state. Returns status messages and a shallow inspect of the loaded data."
    :arguments [{:name "file_path"
                 :description "Optional file path: default scratch_pad.edn"
@@ -237,7 +237,7 @@ After doing this provide a very brief (8 lines) summary of where we are and then
                                                      (.getMessage e))}]})))))})
 
 (defn scratch-pad-save-as [nrepl-client-atom]
-  {:name "scratch_pad_save_as"
+  {:name "ACT/scratch_pad_save_as"
    :description "Saves the current scratch pad state to a specified file."
    :arguments [{:name "file_path"
                 :description "File path: relative to .clojure-mcp/ directory"
