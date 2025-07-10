@@ -26,7 +26,7 @@
                           :docstring-no-summary
                           :docstring-leading-trailing-whitespace
                           :file
-                          #_:reduce-without-init
+                          :reduce-without-init
                           :line-length
                           :missing-docstring
                           :namespace-name-mismatch
@@ -37,7 +37,7 @@
                           :schema-misplaced-return
                           :java-static-field-call
                           :unused-alias
-                          ;; :unused-binding ;; <-- Removed this line to enable the warning
+                          :unused-binding
                           :unused-import
                           :unresolved-namespace
                           :unresolved-symbol

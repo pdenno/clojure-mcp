@@ -1,5 +1,65 @@
 # Changelog
 
+## [v0.1.7-alpha-pre] - 2025-07-08
+
+### Major Improvements
+
+#### Performance Fix: Startup Speed
+Fixed critical issue where ClojureMCP was scanning the home directory, causing extremely slow startup times. The fix includes:
+- **Project inspection optimization**: Reduced from multiple glob calls to a single optimized call
+- **Path validation**: Fixed bad paths being passed to glob functions that caused excessive filesystem scanning
+
+#### Multi-Dialect Support
+Initial support for non-JVM Clojure dialects including Babashka and Basilisp:
+- **Reduced Initializing Clojure Evals**: Minimized reliance on Clojure code evaluation on startup
+- **Multimethod dispatch**: Added `:nrepl-env-type` based dispatch for dialect-specific behavior
+- **Configuration**: Use `:project-dir` command-line option to specify working directory for alternative dialects
+- **Note**: Disable `:bash-over-nrepl` in `.clojure-mcp/config.edn` for non-JVM environments
+
+#### Scratch Pad Persistence
+The scratch pad now automatically saves to `.clojure-mcp/scratch_pad.edn` on every change:
+- **Explicit loading**: Use `scratch_pad_load` prompt to load saved data
+- **Snapshot saving**: Use `scratch_pad_save_as` prompt to save snapshots to named files
+- **Configurable filename**: Set `:scratch-pad-file` in config to use different filenames
+- **Auto-load on startup**: Enable with `:scratch-pad-load true` in config
+
+### Added
+- **Multi-dialect support infrastructure**:
+  - `:nrepl-env-type` configuration parameter for dialect detection
+  - Multimethod dispatch system for dialect-specific behavior
+  - Support for Babashka, Scittle, and Basilisp environments
+- **Scratch pad persistence** with flexible configuration via `.clojure-mcp/config.edn`:
+  - `:scratch-pad-load` boolean flag for auto-loading on startup (default: `false`)
+  - `:scratch-pad-file` to specify filename within `.clojure-mcp/` directory (default: `"scratch_pad.edn"`)
+  - Automatic saving on every change
+- **New prompts for scratch pad file operations**:
+  - `ACT/scratch_pad_load` prompt for loading EDN files into scratch pad
+  - `ACT/scratch_pad_save_as` prompt for saving scratch pad snapshots to named files
+- **Project directory override** with `:project-dir` command-line option
+- **Pattern-based collapsed view for text files** in `read_file` tool:
+  - Shows only lines matching patterns with 20 lines of context
+  - Works with `content_pattern` or `name_pattern` parameters
+- **Bash execution isolation**:
+  - `:bash-over-nrepl` config option to control execution mode (default: `true`)
+  - Separate nREPL session for bash commands to prevent REPL pollution
+  - Output truncation for local bash execution
+
+### Changed
+- **Project inspection performance**: Optimized glob operations from multiple calls to single call
+- **grep and glob_files tools** now properly launch from working directory
+- **Bash tool** enhanced with configurable execution modes
+- Configuration loading no longer attempts to fetch remote configs
+
+### Documentation
+- Added table of contents to README
+- Hopefully improved setup instructions
+- Added Shadow CLJS section to README
+- Updated README with `:project-dir` usage information
+
+### Internal
+- Improved string building performance in various tools
+- Enhanced configuration handling for cleaner code structure
+
 ## [v0.1.6-alpha] - 2025-06-30
 
 ### Performance Improvements
