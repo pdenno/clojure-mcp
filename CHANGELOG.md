@@ -16,12 +16,13 @@ Initial support for non-JVM Clojure dialects including Babashka and Basilisp:
 - **Configuration**: Use `:project-dir` command-line option to specify working directory for alternative dialects
 - **Note**: Disable `:bash-over-nrepl` in `.clojure-mcp/config.edn` for non-JVM environments
 
-#### Scratch Pad Persistence
+#### Scratch Pad Persistence 
 The scratch pad now automatically saves to `.clojure-mcp/scratch_pad.edn` on every change:
 - **Explicit loading**: Use `scratch_pad_load` prompt to load saved data
 - **Snapshot saving**: Use `scratch_pad_save_as` prompt to save snapshots to named files
 - **Configurable filename**: Set `:scratch-pad-file` in config to use different filenames
 - **Auto-load on startup**: Enable with `:scratch-pad-load true` in config
+Many thanks to Mark Addleman for working on this.
 
 ### Added
 - **Multi-dialect support infrastructure**:
