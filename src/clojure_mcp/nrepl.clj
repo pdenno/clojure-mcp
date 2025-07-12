@@ -262,23 +262,23 @@
 (defn create
   ([] (create nil))
   ([config]
-   (let [conn (nrepl/connect
-               (select-keys config [:port :host :tls-keys-file]))
+   (let [conn (apply nrepl/connect
+                     (flatten (seq (select-keys config [:port :host :tls-keys-file]))))
          client (nrepl/client conn Long/MAX_VALUE)
          session (nrepl/new-session client)
          tool-session (nrepl/new-session client)
          ;; ns-session always has an ns declared in evals
-         ns-session (nrepl/new-session client)]
-     (let [state (::state config (atom {}))]
-       (swap! state assoc
-              :conn conn
-              :client client
-              :session session
-              :ns-session ns-session
-              :tool-session tool-session)
-       (assoc config
-              :repl/error (atom nil)
-              ::state state)))))
+         ns-session (nrepl/new-session client)
+         state (::state config (atom {}))]
+     (swap! state assoc
+            :conn conn
+            :client client
+            :session session
+            :ns-session ns-session
+            :tool-session tool-session)
+     (assoc config
+            :repl/error (atom nil)
+            ::state state))))
 
 (comment
 
