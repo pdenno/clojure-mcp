@@ -126,7 +126,7 @@
    - :dirs - Vector of directories to index (defaults to [current-working-directory])
             Can also accept a single string for backwards compatibility
    - :include-tests - Whether to include test files (defaults to false)
-   - :out-file - Output file path (defaults to \"llm_code_index.txt\")
+   - :out-file - Output file path (defaults to \".clojure-mcp/code_index.txt\" in user dir)
    
    Returns a map with :files-indexed, :output-file, :size-bytes, and :time-ms.
    
@@ -137,9 +137,19 @@
    (map-project {:include-tests true :out-file \"full-index.txt\"})"
   [{:keys [dirs include-tests out-file]
     :or {dirs [(System/getProperty "user.dir")]
-         include-tests false
-         out-file "llm_code_index.txt"}}]
-  (let [;; Ensure dirs is a vector
+         include-tests false}}]
+  (let [;; Set default out-file in platform-independent way
+        out-file (or out-file
+                     (-> (System/getProperty "user.dir")
+                         (io/file ".clojure-mcp" "code_index.txt")
+                         (.getAbsolutePath)))
+
+        ;; Ensure parent directory exists
+        out-file-obj (io/file out-file)
+        parent-dir (.getParentFile out-file-obj)
+        _ (when parent-dir (.mkdirs parent-dir))
+
+        ;; Ensure dirs is a vector
         dirs-vec (if (string? dirs) [dirs] dirs)
         start-time (System/currentTimeMillis)
 
