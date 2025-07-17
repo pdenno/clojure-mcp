@@ -40,9 +40,47 @@ Please use it to inform you as to which files should be investigated.\n=========
                                                 content))))))))
       memory)))
 
-(defn reset-memory-if-needed! [working-directory memory]
+(defn initialize-memory-with-files!
+  "Initialize memory with content from specific files.
+   files - vector of absolute file paths to load"
+  [files memory]
+  (if (seq files)
+    (let [contents (for [file-path files
+                         :let [file (io/file file-path)]
+                         :when (.exists file)]
+                     {:path file-path
+                      :content (slurp file)})]
+      (when (seq contents)
+        (.add memory
+              (UserMessage.
+               (vec (for [{:keys [path content]} contents]
+                      (TextContent/from
+                       (str "File: " path "\n"
+                            "=======================\n"
+                            content "\n\n"))))))))
+    memory))
+
+(defn initialize-memory!
+  "Initialize memory based on context configuration.
+   context-config can be:
+   - true: use default code index
+   - sequential: use specific file paths
+   - false/nil: no initialization"
+  [working-directory memory context-config]
+  (cond
+    (true? context-config)
+    (initialize-memory-with-index! working-directory memory)
+
+    (sequential? context-config)
+    (initialize-memory-with-files! context-config memory)
+
+    :else
+    memory))
+
+(defn reset-memory-if-needed! [working-directory memory context-config]
   (if (> (count (.messages memory)) (- MEMORY-SIZE 50))
-    (initialize-memory-with-index! working-directory (doto memory (.clear)))
+    (let [cleared-memory (doto memory (.clear))]
+      (initialize-memory! working-directory cleared-memory context-config))
     memory))
 
 #_(chain/chat-memory 300)
@@ -63,9 +101,9 @@ Please use it to inform you as to which files should be investigated.\n=========
                                    (some-> (chain/agent-model)
                                            (.build)))]
        (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
-             memory (initialize-memory-with-index! working-directory (chain/chat-memory 300))
-             ;; _ (log/debug [:COUNT (count (.messages memory))])
-             ;; _ (prn [:COUNT (count (.messages memory))])
+             base-memory (chain/chat-memory 300)
+             context-config (config/get-dispatch-agent-context @nrepl-client-atom)
+             memory (initialize-memory! working-directory base-memory context-config)
              ai-service-data {:memory memory
                               :model selected-model
                               :tools
@@ -115,7 +153,9 @@ Please use it to inform you as to which files should be investigated.\n=========
       (if-let [ai-service (get-ai-service nrepl-client-atom model)]
         ;; Clear memory for stateless behavior
         (do
-          (reset-memory-if-needed! working-directory (:memory ai-service))
+          (reset-memory-if-needed! working-directory
+                                   (:memory ai-service)
+                                   (config/get-dispatch-agent-context @nrepl-client-atom))
           (let [result (.chat (:service ai-service) prompt)]
             {:result result
              :error false}))

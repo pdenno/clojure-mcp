@@ -132,7 +132,7 @@
   [nrepl-client-map]
   (let [value (get-config nrepl-client-map :scratch-pad-load)]
     (if (nil? value)
-      false                      ; Default to false when not specified
+      false ; Default to false when not specified
       (boolean value))))
 
 (defn get-scratch-pad-file
@@ -143,6 +143,38 @@
     (if (nil? value)
       "scratch_pad.edn" ; Default filename
       value)))
+
+(defn get-dispatch-agent-context
+  "Returns dispatch agent context configuration.
+   Can be:
+   - true/false (boolean) - whether to use default code index
+   - list of file paths - specific files to load into context
+   Defaults to true for backward compatibility."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :dispatch-agent-context)
+        user-dir (get-nrepl-user-dir nrepl-client-map)]
+    (cond
+      (nil? value)
+      true ;; Default to true to maintain existing behavior
+
+      (boolean? value)
+      value
+
+      (sequential? value)
+      ;; Process file paths
+      (->> value
+           (map (fn [path]
+                  (let [file (io/file path)]
+                    (if (.isAbsolute file)
+                      (.getCanonicalPath file)
+                      (.getCanonicalPath (io/file user-dir path))))))
+           (filter #(.exists (io/file %)))
+           vec)
+
+      :else
+      (do
+        (log/warn "Invalid :dispatch-agent-context value, defaulting to true")
+        true))))
 
 (defn set-config*
   "Sets a config value in a map. Returns the updated map.
