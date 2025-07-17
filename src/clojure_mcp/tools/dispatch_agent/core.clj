@@ -2,8 +2,11 @@
   "Core implementation for the dispatch agent tool.
    This namespace contains the pure functionality without any MCP-specific code."
   (:require [clojure.data.json :as json]
+            [clojure.java.io :as io]
             [clojure.string :as string]
             [clojure.tools.logging :as log]
+            [clojure-mcp.config :as config]
+
             [clojure-mcp.agent.langchain :as chain]
             [clojure-mcp.tools.unified-read-file.tool :as read-file-tool]
             [clojure-mcp.tools.directory-tree.tool :as directory-tree-tool]
@@ -13,9 +16,39 @@
             [clojure-mcp.tools.think.tool :as think-tool]
             #_[clojure-mcp.tools.scratch-pad.tool :as scratch-pad-tool])
   (:import
-   [clojure_mcp.agent.langchain AiService]))
+   [clojure_mcp.agent.langchain AiService]
+   [dev.langchain4j.data.message UserMessage TextContent]))
 
 (declare system-message)
+
+(def MEMORY-SIZE 300)
+
+(defn initialize-memory-with-index! [working-directory memory]
+  (let [f (io/file working-directory ".clojure-mcp" "code_index.txt")
+        proj-sumary (io/file working-directory "PROJECT_SUMMARY.md")]
+    (if (.exists f)
+      (let [content (slurp f)]
+        (doto memory
+          (.add (UserMessage.
+                 (cond-> []
+                   (.exists proj-sumary)
+                   (conj (TextContent/from (str "This is a project summary:\n"
+                                                (slurp proj-sumary))))
+                   content
+                   (conj (TextContent/from (str "This is a code index of the code in this project.
+Please use it to inform you as to which files should be investigated.\n=======================\n"
+                                                content))))))))
+      memory)))
+
+(defn reset-memory-if-needed! [working-directory memory]
+  (if (> (count (.messages memory)) (- MEMORY-SIZE 50))
+    (initialize-memory-with-index! working-directory (doto memory (.clear)))
+    memory))
+
+#_(chain/chat-memory 300)
+
+#_(.contents (first (.messages (doto (chain/chat-memory 300)
+                                 (.add (UserMessage. nil "Hello"))))))
 
 (defn create-ai-service
   "Creates an AI service for doing read only tasks.
@@ -29,7 +62,10 @@
      (when-let [selected-model (or model
                                    (some-> (chain/agent-model)
                                            (.build)))]
-       (let [memory (chain/chat-memory 300)
+       (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
+             memory (initialize-memory-with-index! working-directory (chain/chat-memory 300))
+             ;; _ (log/debug [:COUNT (count (.messages memory))])
+             ;; _ (prn [:COUNT (count (.messages memory))])
              ai-service-data {:memory memory
                               :model selected-model
                               :tools
@@ -75,15 +111,16 @@
   (if (string/blank? prompt)
     {:result "Error: Cannot process empty prompt"
      :error true}
-    (if-let [ai-service (get-ai-service nrepl-client-atom model)]
-      ;; Clear memory for stateless behavior
-      (do
-        (.clear (:memory ai-service))
-        (let [result (.chat (:service ai-service) prompt)]
-          {:result result
-           :error false}))
-      {:result "ERROR: No model configured for this agent."
-       :error true})))
+    (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)]
+      (if-let [ai-service (get-ai-service nrepl-client-atom model)]
+        ;; Clear memory for stateless behavior
+        (do
+          (reset-memory-if-needed! working-directory (:memory ai-service))
+          (let [result (.chat (:service ai-service) prompt)]
+            {:result result
+             :error false}))
+        {:result "ERROR: No model configured for this agent."
+         :error true}))))
 
 (defn validate-dispatch-agent-inputs
   "Validates inputs for the dispatch-agent function"
@@ -122,11 +159,12 @@
     #_(.chat (:service ai-default) "find langchain integration code")
 
     ;; Test with custom model  
-    (.chat (:service ai-custom) "find the langchain integration code"))
-  )
+    (.chat (:service ai-custom) "find the langchain integration code")))
 
 (def system-message
   "You are an agent for a Clojure Coding Assistant. Given the user's prompt, you should use the tools available to you to answer the user's question.
+
+You MAY be provided with a project summary and a code-index... Please use these as a starting poing to answering the provided question.
 
 Notes:
 1. IMPORTANT: You should be concise, direct, and to the point, since your responses will be displayed on a command line interface. Answer the user's question directly, without elaboration, explanation, or details. One word answers are best. Avoid introductions, conclusions, and explanations. You MUST avoid text before/after your response, such as \"The answer is <answer>.\", \"Here is the content of the file...\" or \"Based on the information provided, the answer is...\" or \"Here is what I will do next...\".
