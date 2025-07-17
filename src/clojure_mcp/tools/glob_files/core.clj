@@ -6,8 +6,7 @@
             [clojure.java.shell :as shell]
             [clojure.tools.logging :as log])
   (:import
-   (java.nio.file FileVisitResult FileSystems Files Path Paths SimpleFileVisitor)
-   (java.nio.file.attribute BasicFileAttributes)))
+   (java.nio.file FileVisitResult FileSystems Files Paths SimpleFileVisitor)))
 
  ;; Cache tool availability to avoid repeated shell calls
 (def ^:private tool-availability (atom {}))
@@ -15,20 +14,23 @@
 (defn- check-tool-available?
   "Check if a command-line tool is available and cache the result.
    Tests actual tool execution rather than just PATH existence for better reliability."
-  [tool-name]
+  [dir tool-name]
   (if-let [cached (@tool-availability tool-name)]
     cached
     (let [result (try
                    (case tool-name
                      "rg"
-                     (zero? (:exit (shell/sh tool-name "--version")))
+                     (zero? (:exit (shell/with-sh-dir dir
+                                     (shell/sh tool-name "--version"))))
 
                      "find"
                    ;; Test with a simple, cross-platform find command
-                     (zero? (:exit (shell/sh tool-name "." "-name" "." "-type" "d")))
+                     (zero? (:exit (shell/with-sh-dir dir
+                                     (shell/sh tool-name "." "-name" "." "-type" "d"))))
 
                    ;; Default fallback test
-                     (zero? (:exit (shell/sh tool-name "--help"))))
+                     (zero? (:exit (shell/with-sh-dir dir
+                                     (shell/sh tool-name "--help")))))
                    (catch Exception _ false))]
       (swap! tool-availability assoc tool-name result)
       result)))
@@ -264,11 +266,11 @@
         ;; Check tool availability and prefer rg > find > NIO
                 ;; Check tool availability and prefer rg > find > NIO
         (cond
-          (check-tool-available? "rg")
+          (check-tool-available? dir "rg")
           (do (log/debug "Selected tool: rg")
               (glob-with-rg dir pattern max-results))
 
-          (check-tool-available? "find")
+          (check-tool-available? dir "find")
           (do (log/debug "Selected tool: find")
               (glob-with-find dir pattern max-results))
 
