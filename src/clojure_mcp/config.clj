@@ -144,6 +144,9 @@
       "scratch_pad.edn" ; Default filename
       value)))
 
+(defn get-mcp-client-hint [nrepl-client-map]
+  (get-config nrepl-client-map :mcp-client-hint))
+
 (defn get-dispatch-agent-context
   "Returns dispatch agent context configuration.
    Can be:

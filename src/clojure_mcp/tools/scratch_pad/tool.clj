@@ -186,21 +186,28 @@ Viewing tasks:
   depth: 2
   explanation: View tasks with limited nesting")
 
-(defmethod tool-system/tool-schema :scratch-pad [_]
-  {:type "object"
-   :properties {"op" {:type "string"
-                      :enum ["set_path" "get_path" "delete_path" "inspect"]
-                      :description "The operation to perform:\n * set_path: set a value at a path\n * get_path: retrieve a value at a path\n * delete_path: remove the value at the path from the data structure\n * inspect: view the datastructure (or a specific path within it) up to a certain depth\n"}
-                "path" {:type "array"
-                        :items {:type "string" #_["string" "number"]}
-                        :description "Path to the data location (array of string or number keys) - used for set_path, get_path, delete_path, and optionally inspect"}
-                "value" {:description "Value to store (for set_path). Can be ANY JSON value EXCEPT null: object, array, string, number, boolean."
-                         :type "object" #_["object" "array" "string" "number" "boolean"]}
-                "explanation" {:type "string"
-                               :description "Explanation of why this operation is being performed"}
-                "depth" {:type "number"
-                         :description "(Optional) For inspect operation: Maximum depth to display (default: 5). Must be a positive integer."}}
-   :required ["op" "explanation"]})
+(defmethod tool-system/tool-schema :scratch-pad [{:keys [nrepl-client-atom]}]
+  (let [client-hint (when nrepl-client-atom
+                      (config/get-mcp-client-hint @nrepl-client-atom))
+        claude-desktop? (= client-hint :claude-desktop)]
+    {:type "object"
+     :properties {"op" {:type "string"
+                        :enum ["set_path" "get_path" "delete_path" "inspect"]
+                        :description "The operation to perform:\n * set_path: set a value at a path\n * get_path: retrieve a value at a path\n * delete_path: remove the value at the path from the data structure\n * inspect: view the datastructure (or a specific path within it) up to a certain depth\n"}
+                  "path" {:type "array"
+                          :items (if claude-desktop?
+                                   {:type ["string" "number"]}
+                                   {:type "string"})
+                          :description "Path to the data location (array of string or number keys) - used for set_path, get_path, delete_path, and optionally inspect"}
+                  "value" {:description "Value to store (for set_path). Can be ANY JSON value EXCEPT null: object, array, string, number, boolean."
+                           :type (if claude-desktop?
+                                   ["object" "array" "string" "number" "boolean"]
+                                   "object")}
+                  "explanation" {:type "string"
+                                 :description "Explanation of why this operation is being performed"}
+                  "depth" {:type "number"
+                           :description "(Optional) For inspect operation: Maximum depth to display (default: 5). Must be a positive integer."}}
+     :required ["op" "explanation"]}))
 
 (defmethod tool-system/validate-inputs :scratch-pad [{:keys [nrepl-client-atom]} inputs]
   ;; convert set_path path nil -> delete_path path
