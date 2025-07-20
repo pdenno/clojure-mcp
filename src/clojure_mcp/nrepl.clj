@@ -101,10 +101,6 @@
   ([{:keys [::state] :as service} session new-ns]
    (swap! state assoc-in [:current-ns session] new-ns)))
 
-(defn new-session [{:keys [::state] :as service}]
-  (when-let [client (:client @state)]
-    (nrepl/new-session client)))
-
 (defn new-message [{:keys [::state] :as service} msg]
   (merge
    {:session (eval-session service)
@@ -201,6 +197,15 @@
                (new-tool-message service {:op "describe"})
                (->> identity
                     (done #(deliver prom %))))
+    (deref prom 600 nil)))
+
+(defn new-session [service]
+  (let [prom (promise)]
+    (send-msg! service
+               ;; this will clone the tool session
+               (new-tool-message service {:op "clone"})
+               (->> identity
+                    (done #(deliver prom (get % :new-session)))))
     (deref prom 600 nil)))
 
 (defn send-input [{:keys [::state] :as service} input]

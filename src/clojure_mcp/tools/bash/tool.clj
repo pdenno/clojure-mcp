@@ -10,6 +10,17 @@
    [clojure.java.io :as io]
    [clojure.string :as str]))
 
+(defn create-bash-over-nrepl-session [nrepl-client]
+  (or
+   (try
+     (nrepl/new-session nrepl-client)
+     (catch Exception e
+       (log/error e "Could not create separate session for bash tool")
+       nil))
+   (do
+     (log/debug "Could not create separate session for bash tool")
+     nil)))
+
 ;; Factory function to create the tool configuration
 (defn create-bash-tool
   "Creates the bash tool configuration.
@@ -18,15 +29,17 @@
    - nrepl-client-atom: Atom containing the nREPL client"
   [nrepl-client-atom]
   (let [nrepl-client @nrepl-client-atom
-        session (try
-                  (nrepl/new-session nrepl-client)
-                  (catch Exception e
-                    (log/debug "Could not create separate session for bash tool" e)
-                    nil))]
-    {:tool-type :bash
-     :nrepl-client-atom nrepl-client-atom
-     :nrepl-session session
-     :working-dir (config/get-nrepl-user-dir nrepl-client)}))
+        session (when (config/get-bash-over-nrepl nrepl-client)
+                  (or (create-bash-over-nrepl-session nrepl-client)
+                      ;; Fail fast if security assumption fails
+                      ;; or we can fall back to the current session
+                      ;; but clearly something wrong if we can't create
+                      ;; a session 
+                      (throw (ex-info "Failed to initialize nrepl session for bash tool" {:tool :bash-tool}))))]
+    (cond-> {:tool-type :bash
+             :nrepl-client-atom nrepl-client-atom
+             :working-dir (config/get-nrepl-user-dir nrepl-client)}
+      session (assoc :nrepl-session session))))
 
 ;; Implement the required multimethods for the bash tool
 (defmethod tool-system/tool-name :bash [_]
@@ -101,10 +114,8 @@ in the response to determine command success.")
         timeout_ms (assoc :timeout-ms timeout_ms)))))
 
 (defmethod tool-system/execute-tool :bash [{:keys [nrepl-client-atom nrepl-session]} inputs]
-  (let [{:keys [command working-directory timeout-ms]} inputs
-        nrepl-client @nrepl-client-atom
-        use-nrepl? (config/get-bash-over-nrepl nrepl-client)]
-    (if use-nrepl?
+  (let [nrepl-client @nrepl-client-atom]
+    (if (config/get-bash-over-nrepl nrepl-client)
       ;; Execute over nREPL with session
       (let [inputs-with-session (assoc inputs :session nrepl-session)]
         (core/execute-bash-command-nrepl nrepl-client-atom inputs-with-session))
