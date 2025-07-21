@@ -30,16 +30,11 @@
   [nrepl-client-atom]
   (let [nrepl-client @nrepl-client-atom
         session (when (config/get-bash-over-nrepl nrepl-client)
-                  (or (create-bash-over-nrepl-session nrepl-client)
-                      ;; Fail fast if security assumption fails
-                      ;; or we can fall back to the current session
-                      ;; but clearly something wrong if we can't create
-                      ;; a session 
-                      (throw (ex-info "Failed to initialize nrepl session for bash tool" {:tool :bash-tool}))))]
-    (cond-> {:tool-type :bash
-             :nrepl-client-atom nrepl-client-atom
-             :working-dir (config/get-nrepl-user-dir nrepl-client)}
-      session (assoc :nrepl-session session))))
+                  (create-bash-over-nrepl-session nrepl-client))]
+    {:tool-type :bash
+     :nrepl-client-atom nrepl-client-atom
+     :working-dir (config/get-nrepl-user-dir nrepl-client)
+     :nrepl-session session}))
 
 ;; Implement the required multimethods for the bash tool
 (defmethod tool-system/tool-name :bash [_]
