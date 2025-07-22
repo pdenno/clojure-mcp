@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.1.7-alpha] - 2025-07-22
+
+Note the major changes listed in `0.1.7-alpha-pre` below which are part of this release.
+
+Moving out of pre-release with several code fixes. A new configuration option allows the dispatch_agent to load files as context. The `:dispatch-agent-context` setting accepts either:
+- `true` - automatically loads `PROJECT_SUMMARY.md` (if available) and `./.clojure-mcp/code_index.txt` (the new default output location for `clojure-mcp.code-indexer`)
+- A vector of file paths - loads the specified files into the dispatch_agent context
+
+This enables dispatch_agent to have better project awareness through pre-loaded context files.
+
+### Fixed
+- **Race condition in nREPL session creation** - Fixed critical race condition in `clojure-mcp.nrepl/new-session` that could cause session initialization failures
+- **Working directory handling** - Shell commands now properly use the working directory when executing
+
+### Added
+- **:mcp-client-hint configuration** - New config option for providing hints to MCP clients about tool capabilities, used in scratch_pad tool schema - currently this allows me to experiment with using the more specific scratch_pad schema on claude desktop...
+- **:dispatch-agent-context configuration** - New config option for providing context to dispatch agents 
+
+### Changed
+- **Updated to latest Clojure version** - Project now uses the most recent Clojure release
+- **Code simplification** - Various internal simplifications to improve maintainability
+
+### Documentation
+- **Dual Shadow mode documentation** - Added documentation for dual Shadow CLJS mode setup
+- **Minor grammar fixes** - Improved clarity in various documentation sections
+- **Updated PROJECT_SUMMARY prompt** - Corrected command name in documentation
+
+### Internal
+- Fixed nREPL server function invocation
+- Moved default code indexer output in preparation for dispatch-agent-content configuration
+- Minor deps.edn configuration adjustments
+
+### Contributors
+Thanks to Jonathon McKitrick for documenting dual Shadow mode and Thomas Mattacchione for the PROJECT_SUMMARY prompt update.
+
 ## [v0.1.7-alpha-pre] - 2025-07-08
 
 ### Major Improvements
@@ -28,7 +63,7 @@ Many thanks to Mark Addleman for working on this.
 - **Multi-dialect support infrastructure**:
   - `:nrepl-env-type` configuration parameter for dialect detection
   - Multimethod dispatch system for dialect-specific behavior
-  - Support for Babashka, Scittle, and Basilisp environments
+  - Support for Babashka, and Basilisp environments
 - **Scratch pad persistence** with flexible configuration via `.clojure-mcp/config.edn`:
   - `:scratch-pad-load` boolean flag for auto-loading on startup (default: `false`)
   - `:scratch-pad-file` to specify filename within `.clojure-mcp/` directory (default: `"scratch_pad.edn"`)
