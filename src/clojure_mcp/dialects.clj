@@ -72,7 +72,21 @@
   [_]
   [])
 
-;; High-level wrapper functions that execute the expressions
+(defmulti fetch-project-directory-helper (fn [nrepl-env-type _] nrepl-env-type))
+
+(defmethod fetch-project-directory-helper :default [nrepl-env-type nrepl-client-map]
+  ;; default to fetching from the nrepl
+  (when-let [exp (fetch-project-directory-exp nrepl-env-type)]
+    (try
+      (edn/read-string
+       (nrepl/tool-eval-code nrepl-client-map exp))
+      (catch Exception e
+        (log/warn e "Failed to fetch project directory")
+        nil))))
+
+(defmethod fetch-project-directory-helper :scittle [_ nrepl-client-map]
+  (when-let [desc (nrepl/describe nrepl-client-map)]
+    (some-> desc :aux :cwd io/file (.getCanonicalPath))))
 
 (defn fetch-project-directory
   "Fetches the project directory for the given nREPL client.
@@ -81,13 +95,9 @@
   [nrepl-client-map nrepl-env-type project-dir]
   (if project-dir
     (.getCanonicalPath (io/file project-dir))
-    (when-let [exp (fetch-project-directory-exp nrepl-env-type)]
-      (try
-        (edn/read-string
-         (nrepl/tool-eval-code nrepl-client-map exp))
-        (catch Exception e
-          (log/warn e "Failed to fetch project directory")
-          nil)))))
+    (fetch-project-directory-helper nrepl-env-type nrepl-client-map)))
+
+;; High-level wrapper functions that execute the expressions
 
 (defn initialize-environment
   "Initializes the environment by evaluating dialect-specific expressions.
@@ -113,6 +123,7 @@
       (get versions :clojure) :clj
       (get versions :babashka) :bb
       (get versions :basilisp) :basilisp
+      (get versions :sci-nrepl) :scittle
       :else :unknown)))
 
 ;; Future dialect support placeholders
