@@ -928,7 +928,59 @@ The customization approach is both easy and empowering - you're essentially buil
 
 For a quick start: **[Creating Your Own Custom MCP Server](doc/custom-mcp-server.md)** - This is where most users should begin. 
 
-## ⚙️ Configuration
+## CLI options
+
+Using the -X invocation requires EDN values.
+
+#### `:port`
+**Required** - The nREPL server port to connect to.
+
+`:port 7888`
+
+#### `:host`
+**Optional** - The nREPL server host. Defaults to localhost if not specified.
+
+`:host "localhost"` or `:host "0.0.0.0"`
+
+#### `:config-file`
+**Optional** - Specify the location of a configuration file. Must be a path to an existing file.
+
+`:config-file "/path/to/config.edn"`
+
+#### `:project-dir`
+**Optional** - Specify the working directory for your codebase. This overrides the automatic introspection of the project directory from the nREPL connection. Must be a path to an existing directory.
+
+`:project-dir "/path/to/your/clojure/project"`
+
+#### `:nrepl-env-type` 
+**Optional** - Specify the type of environment that we are connecting to over the nREPL connection. This overrides automatic detection. Valid options are:
+
+* `:clj` for Clojure or ClojureScript
+* `:bb` for [Babashka](https://babashka.org/) - Native, fast starting Clojure interpreter for scripting
+* `:basilisp` for [Basilisp](https://basilisp.readthedocs.io/) - A Clojure-compatible Lisp dialect targeting Python 3.9+
+* `:scittle` for [Scittle](https://github.com/babashka/scittle) - Execute ClojureScript directly from browser script tags
+
+`:nrepl-env-type :bb`
+
+### Example Usage
+
+```bash
+# Basic usage with just port
+clojure -X:mcp :port 7888
+
+# With custom host and project directory
+clojure -X:mcp :port 7888 :host '"0.0.0.0"' :project-dir '"/path/to/project"'
+
+# Using a custom config file
+clojure -X:mcp :port 7888 :config-file '"/path/to/custom-config.edn"'
+
+# Specifying Babashka environment
+clojure -X:mcp :port 7888 :nrepl-env-type :bb
+```
+
+**Note**: When using `-X` invocation, string values need to be properly quoted for the shell, hence `'"value"'` syntax for strings. 
+
+## Configuration
 
 The Clojure MCP server supports minimal project-specific configuration
 through a `.clojure-mcp/config.edn` file in your project's root
@@ -948,40 +1000,12 @@ your-project/
 └── ...
 ```
 
-### Configuration Options
+### Configuration Options 
 
-#### `config-file`
-Command-line option to specify location of configuration file.
-
-#### `project-dir`
-Command-line option to specify working directory for alternative dialects.
-
-#### `dispatch-agent-context`
-Primes the dispatch agent with details about your code to help it find answers more quickly and accurately.
-
-**Available values:**
-- `true` (default) - Adds `PROJECT_SUMMARY.md` (if available) and `./.clojure-mcp/code_index.txt` into context
-- Specifies a vector of specific files sent to `dispatch_agent`
-
-NOTE: May consume more API tokens or even exceed the context window of the LLM
-
-#### `allowed-directories`
+#### `:allowed-directories`
 Controls which directories the MCP tools can access for security. Paths can be relative (resolved from project root) or absolute.
 
-#### `emacs-notify` 
-Boolean flag to enable Emacs integration notifications.
-
-Emacs notify is only a toy for now... it switches focuses on the file
-being edited and highlights changes as they are happening.  There are
-probably much better ways to handle this with auto-revert and existing
-emacs libraries.
-
-**Prerequisites for Emacs Integration:**
-- `emacsclient` must be available in your system PATH
-- Emacs server must be running (start with `M-x server-start` or add `(server-start)` to your init file)
-- The integration allows the MCP server to communicate with your Emacs editor for enhanced development workflows
-
-#### `cljfmt`
+#### `:cljfmt`
 Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: `true`). When disabled, file edits preserve the original formatting without applying cljfmt.
 
 **Available values:**
@@ -1039,6 +1063,28 @@ Filename for scratch pad persistence (default: `"scratch_pad.edn"`).
 
 **Configuration:**
 - Specifies the filename within `.clojure-mcp/` directory
+
+#### `dispatch-agent-context`
+Primes the dispatch agent with details about your code to help it find answers more quickly and accurately.
+
+**Available values:**
+- `true` (default) - Adds `PROJECT_SUMMARY.md` (if available) and `./.clojure-mcp/code_index.txt` into context
+- Specifies a vector of specific files sent to `dispatch_agent`
+
+NOTE: May consume more API tokens or even exceed the context window of the LLM
+
+#### `emacs-notify` 
+Boolean flag to enable Emacs integration notifications.
+
+Emacs notify is only a toy for now... it switches focuses on the file
+being edited and highlights changes as they are happening.  There are
+probably much better ways to handle this with auto-revert and existing
+emacs libraries.
+
+**Prerequisites for Emacs Integration:**
+- `emacsclient` must be available in your system PATH
+- Emacs server must be running (start with `M-x server-start` or add `(server-start)` to your init file)
+- The integration allows the MCP server to communicate with your Emacs editor for enhanced development workflows
 
 ### Example Configuration
 
