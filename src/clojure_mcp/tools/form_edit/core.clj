@@ -165,6 +165,37 @@
 
 ;; Form editing operations
 
+(defn walk-back-to-non-comment [zloc]
+  (z/find-next zloc z/prev* (fn [zloc] (not= :comment (n/tag (z/node zloc))))))
+
+(defn remove-consecutive-comments [zloc]
+  (if (n/whitespace-or-comment? (z/node zloc))
+    (remove-consecutive-comments
+     (-> zloc
+         z/remove*
+         z/next*))
+    zloc))
+
+(defn replace-top-level-form
+  "function replacement with special handling for leading comments"
+  [form-zloc content-str]
+  (if (-> content-str str/trim (str/starts-with? ";;"))
+    (-> form-zloc
+        walk-back-to-non-comment
+        z/next*
+        remove-consecutive-comments
+        (z/replace (p/parse-string-all content-str)))
+    (z/replace form-zloc (p/parse-string-all content-str))))
+
+(defn insert-before-top-level-form [zloc content-str]
+  (-> zloc
+      walk-back-to-non-comment
+      z/next*
+      (z/insert-left (p/parse-string-all "\n\n"))
+      z/left
+      (z/insert-left (p/parse-string-all content-str))
+      z/left))
+
 (defn edit-top-level-form
   "Edit a top-level form by replacing it or inserting content before or after.
    
@@ -187,13 +218,8 @@
        find-result ;; Return the result with nil :zloc and any similar-matches
        (let [updated-zloc
              (case edit-type
-               :replace (z/replace form-zloc (p/parse-string-all content-str))
-               ;; it would be nice if this handled comments immediately preceeding the form
-               :before (-> form-zloc
-                           (z/insert-left (p/parse-string-all "\n\n"))
-                           z/left
-                           (z/insert-left (p/parse-string-all content-str))
-                           z/left)
+               :replace (replace-top-level-form form-zloc content-str)
+               :before (insert-before-top-level-form form-zloc content-str)
                :after (-> form-zloc
                           (z/insert-right (p/parse-string-all "\n\n"))
                           z/right
