@@ -635,7 +635,7 @@ Returns a diff showing the changes made to the file.")
   (def insert-after-tool (create-edit-insert-after-form-tool client-atom))
   (def docstring-tool (create-edit-docstring-tool client-atom))
   (def comment-tool (create-edit-comment-block-tool client-atom))
-  (def outline-tool (create-file-structure-tool client-atom))
+
   (def sexp-tool (create-edit-replace-sexp-tool client-atom))
 
   ;; Test the replace form tool
@@ -700,7 +700,6 @@ Returns a diff showing the changes made to the file.")
   ;; Test various tools
   (test-tool replace-tool replace-inputs)
   (test-tool comment-tool comment-inputs)
-  (test-tool outline-tool {:file_path "/tmp/test.clj"})
   (test-tool sexp-tool sexp-inputs)
   (test-tool sexp-tool anon-fn-inputs)
   (test-tool sexp-tool empty-str-inputs)

@@ -191,9 +191,9 @@
   (-> zloc
       walk-back-to-non-comment
       z/next*
-      (z/insert-left (p/parse-string-all "\n\n"))
+      (z/insert-left* (p/parse-string-all "\n\n"))
       z/left
-      (z/insert-left (p/parse-string-all content-str))
+      (z/insert-left* (p/parse-string-all content-str))
       z/left))
 
 (defn edit-top-level-form
@@ -221,9 +221,9 @@
                :replace (replace-top-level-form form-zloc content-str)
                :before (insert-before-top-level-form form-zloc content-str)
                :after (-> form-zloc
-                          (z/insert-right (p/parse-string-all "\n\n"))
+                          (z/insert-right* (p/parse-string-all "\n\n"))
                           z/right
-                          (z/insert-right (p/parse-string-all content-str))
+                          (z/insert-right* (p/parse-string-all content-str))
                           z/right))]
          {:zloc updated-zloc
           :similar-matches (:similar-matches find-result)})))))
