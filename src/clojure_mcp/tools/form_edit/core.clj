@@ -179,7 +179,7 @@
 (defn replace-top-level-form
   "function replacement with special handling for leading comments"
   [form-zloc content-str]
-  (if (-> content-str str/trim (str/starts-with? ";;"))
+  (if (-> content-str str/trim (str/starts-with? ";"))
     (-> form-zloc
         walk-back-to-non-comment
         z/next*
