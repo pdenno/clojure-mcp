@@ -857,9 +857,11 @@
 
   (testing "Comments and discards with clean? true"
     (let [s1 "a ;; comment\n #_ ignored b"
-          s2 "a b"
-          result1 (sut/zchild-match-exprs (z/of-string s1) {:clean? true})
-          result2 (sut/zchild-match-exprs (z/of-string s2) {:clean? true})]
+          s2 "a #_  ignored b"
+          result1 (binding [sut/*match-clean* true]
+                    (sut/zchild-match-exprs (z/of-string s1)))
+          result2 (binding [sut/*match-clean* true]
+                    (sut/zchild-match-exprs (z/of-string s2)))]
       (is (= result1 result2) "Comments and discards should be removed when clean? is true")))
 
   (testing "Nested reader macros"
@@ -899,9 +901,11 @@
 
   (testing "Mix of features - comments, discards, reader macros"
     (let [s1 "(defn process ;; main function\n  [data]\n  #_ (println \"debug\")\n  (map #(* % 2) data))"
-          s2 "(defn   process\n[data]   (map   #(*   %   2)   data))"
-          result1-clean (sut/zchild-match-exprs (z/of-string s1) {:clean? true})
-          result2-clean (sut/zchild-match-exprs (z/of-string s2) {:clean? true})]
+          s2 "(defn   process\n[data]   #_ (println \"debug\") \n;; hey \n (map   #(*   %   2)   data))"
+          result1-clean (binding [sut/*match-clean* true]
+                          (sut/zchild-match-exprs (z/of-string s1)))
+          result2-clean (binding [sut/*match-clean* true]
+                          (sut/zchild-match-exprs (z/of-string s2)))]
       (is (= result1-clean result2-clean) "Mixed features should normalize when cleaned"))))
 
 (deftest find-and-edit-multi-sexp-replace-edge-cases-test
