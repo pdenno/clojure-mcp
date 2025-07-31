@@ -60,7 +60,7 @@ Examples:
     (when-not code
       (throw (ex-info (str "Missing required parameter: code " (pr-str inputs))
                       {:inputs inputs})))
-    (when (not (number? timeout_ms))
+    (when (and timeout_ms (not (number? timeout_ms)))
       (throw (ex-info (str "Error parameter must be number: timeout_ms " (pr-str inputs))
                       {:inputs inputs})))
     ;; Return validated inputs (could do more validation/coercion here)
