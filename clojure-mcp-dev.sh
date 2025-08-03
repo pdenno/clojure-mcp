@@ -12,7 +12,7 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 STDIN_LOG="$SCRIPT_DIR/logs/mcp_stdin.log"
 STDOUT_LOG="$SCRIPT_DIR/logs/mcp_stdout.log"
 
-source  ~/.whim_api_key_creds.sh
+source  ~/.current_api_keys
 
 # Create a named pipe for stdin capture
 PIPE=$(mktemp -u)

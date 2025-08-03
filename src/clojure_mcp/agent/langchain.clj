@@ -24,7 +24,8 @@
     AnthropicStreamingChatModel
     AnthropicChatModelName]
    [dev.langchain4j.model.googleai
-    GoogleAiGeminiChatModel]
+    GoogleAiGeminiChatModel
+    GeminiThinkingConfig]
    [java.util.function Consumer Function]
 
    [dev.langchain4j.model.openai
@@ -40,24 +41,59 @@
 ;; simple API as we don't really need more right now
 
 (defn create-gemini-model [model-name]
-  (-> (OpenAiChatModel/builder)
-      (.baseUrl "https://generativelanguage.googleapis.com/v1beta/openai/")
+  (-> (GoogleAiGeminiChatModel/builder)
       (.apiKey (System/getenv "GEMINI_API_KEY"))
+      (.maxRetries (int 3))
       (.modelName model-name)))
+
+(defn gemini-reasoning-effort [builder effort]
+  (let [budget (get {:low 1024 :medium 4096 :high 8192} (or effort :low))]
+    (.thinkingConfig
+     builder
+     (-> (GeminiThinkingConfig/builder)
+         (.includeThoughts true)
+         (.thinkingBudget (int budget))
+         (.build)))))
+
+(defn create-gemini-reasoning-model [model-name effort]
+  (-> (create-gemini-model model-name)
+      (.returnThinking true)
+      (.sendThinking true)
+      (gemini-reasoning-effort effort)))
 
 (defn create-openai-model [model-name]
   (-> (OpenAiChatModel/builder)
       (.apiKey (System/getenv "OPENAI_API_KEY"))
+      (.maxRetries (int 3))
       (.modelName model-name)))
 
-;; reasoning not supported yet??
-;; Langchain Anthropic client is unstable, using OPENAI api is better but
-;; can't seem to find how to add request parameters for thinking to it
+(declare default-request-parameters reasoning-effort)
+
+(defn create-openai-reasoning-model [model-name effort]
+  (-> (create-openai-model model-name)
+      (default-request-parameters
+       #(reasoning-effort % effort))))
+
 (defn create-anthropic-model [model-name]
-  (-> (OpenAiChatModel/builder)
-      (.baseUrl "https://api.anthropic.com/v1/")
+  (-> (AnthropicChatModel/builder)
       (.apiKey (System/getenv "ANTHROPIC_API_KEY"))
+      (.maxRetries (int 3))
       (.modelName model-name)))
+
+(defn anthropic-reasoning-effort [builder effort]
+  (let [budget (get {:low 1024 :medium 4096 :high 8192} (or effort :low))
+        max-tokens (get {:low 4096 :medium (* 6 1024) :high (* 10 1024)}
+                        (or effort :low))]
+    (-> builder
+        (.thinkingBudgetTokens (int budget))
+        (.maxTokens (int max-tokens)))))
+
+(defn create-anthropic-reasoning-model [model-name effort]
+  (-> (create-anthropic-model model-name)
+      (.thinkingType "enabled")
+      (anthropic-reasoning-effort effort)
+      (.sendThinking true)
+      (.returnThinking true)))
 
 (defn default-request-parameters [model-builder configure-fn]
   (.defaultRequestParameters model-builder
@@ -72,25 +108,25 @@
 
 (defn reasoning-agent-model []
   (cond
+    (System/getenv "ANTHROPIC_API_KEY")
+    (create-anthropic-reasoning-model AnthropicChatModelName/CLAUDE_SONNET_4_20250514 :medium)
     (System/getenv "GEMINI_API_KEY")
-    (create-gemini-model "gemini-2.5-flash-preview-05-20")
+    (create-gemini-reasoning-model "gemini-2.5-flash" :medium)
     (System/getenv "OPENAI_API_KEY")
-    (create-openai-model "o4-mini")
+    (create-openai-reasoning-model "o4-mini" :medium)
     :else nil))
 
 (defn agent-model []
   (cond
+    (System/getenv "ANTHROPIC_API_KEY")
+    (create-anthropic-model AnthropicChatModelName/CLAUDE_SONNET_4_20250514)
     (System/getenv "GEMINI_API_KEY")
-    (create-gemini-model "gemini-2.5-flash-preview-05-20")
+    (create-gemini-model "gemini-2.5-flash")
     (System/getenv "OPENAI_API_KEY")
     (create-openai-model "o4-mini")
-    (System/getenv "ANTHROPIC_API_KEY")
-    (create-anthropic-model AnthropicChatModelName/CLAUDE_3_7_SONNET_20250219)
     :else nil))
 
-#_(-> (agent-model)
-      (default-request-parameters #(max-output-tokens % 4096))
-      (.build))
+;; simple API as we don't really need more right now
 
 (defn chat-memory
   ([]

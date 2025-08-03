@@ -28,8 +28,6 @@
    (try
      (when-let [selected-model (or model
                                    (some-> (chain/reasoning-agent-model)
-                                           (chain/default-request-parameters
-                                            #(chain/reasoning-effort % :medium))
                                            (.build)))]
        (let [memory (chain/chat-memory 300)
              ai-service-data {:memory memory

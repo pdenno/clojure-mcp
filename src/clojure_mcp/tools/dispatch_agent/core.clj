@@ -201,7 +201,7 @@ Please use it to inform you as to which files should be investigated.\n=========
         ai-default (create-ai-service client-atom)
         ;; Use custom model
         custom-model (->
-                      (chain/create-gemini-model "gemini-2.5-flash-preview-05-20")
+                      (chain/create-gemini-reasoning-model "gemini-2.5-pro" :medium)
                       #_(chain/create-anthropic-model "claude-3-7-sonnet-20250219")
                       (.build))
         ai-custom (create-ai-service client-atom custom-model)]
