@@ -12,58 +12,55 @@
     OpenAiChatModel
     OpenAiChatRequestParameters]))
 
+(def model-base
+  "Base configuration for standard models"
+  {:temperature 1
+   :max-tokens 4096
+   :max-retries 3
+   :timeout 60000})
+
+(def reasoning-model-base
+  "Base configuration for reasoning models"
+  {:temperature 1
+   :max-tokens 8192
+   :max-retries 3
+   :timeout 120000})
+
+(def thinking-base
+  "Common thinking configuration for reasoning models"
+  {:enabled true
+   :return true
+   :send true
+   :effort :medium})
+
 (def default-configs
   {:openai/o4-mini
-   {:model-name "o4-mini"
-    :temperature 1
-    :max-tokens 4096
-    :max-retries 3
-    :timeout 60000}
+   (merge model-base
+          {:model-name "o4-mini"})
 
    :openai/o4-mini-reasoning
-   {:model-name "o4-mini"
-    :temperature 1
-    :max-tokens 8192
-    :max-retries 3
-    :timeout 120000
-    :thinking {:effort :medium}}
+   (merge reasoning-model-base
+          {:model-name "o4-mini"
+           :thinking {:effort :medium}})
 
    :google/gemini-2-5-flash
-   {:model-name "gemini-2.5-flash"
-    :temperature 1
-    :max-tokens 4096
-    :max-retries 3
-    :timeout 60000}
+   (merge model-base
+          {:model-name "gemini-2.5-flash"})
 
    :google/gemini-2-5-flash-reasoning
-   {:model-name "gemini-2.5-flash"
-    :temperature 1
-    :max-tokens 8192
-    :max-retries 3
-    :timeout 120000
-    :thinking {:enabled true
-               :return true
-               :send true
-               :effort :medium}}
+   (merge reasoning-model-base
+          {:model-name "gemini-2.5-flash"
+           :thinking thinking-base})
 
    :anthropic/claude-sonnet-4
-   {:model-name AnthropicChatModelName/CLAUDE_SONNET_4_20250514
-    :temperature 1
-    :max-tokens 4096
-    :max-retries 3
-    :timeout 60000}
+   (merge model-base
+          {:model-name AnthropicChatModelName/CLAUDE_SONNET_4_20250514})
 
    :anthropic/claude-sonnet-4-reasoning
-   {:model-name AnthropicChatModelName/CLAUDE_SONNET_4_20250514
-    :temperature 1
-    :max-tokens 8192
-    :max-retries 3
-    :timeout 120000
-    :thinking {:enabled true
-               :return true
-               :send true
-               :effort :medium
-               :budget-tokens 4096}}})
+   (merge reasoning-model-base
+          {:model-name AnthropicChatModelName/CLAUDE_SONNET_4_20250514
+           :thinking (merge thinking-base
+                            {:budget-tokens 4096})})})
 
 (defn get-provider [model-key]
   (-> model-key namespace keyword))
