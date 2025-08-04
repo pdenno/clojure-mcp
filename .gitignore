@@ -51,3 +51,17 @@ NOTES.md
 *.tmp
 /.idea/
 /clojure-mcp.iml
+
+# Development test files
+/dev/edit_test.clj
+/dev/test_*.clj
+/test-complex-sexp.clj
+/bb.edn
+/claude-clj.sh
+
+# Editor backup files
+*#
+.#*
+
+# Log directories
+/logs/
