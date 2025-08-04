@@ -265,7 +265,7 @@
 (defn get-disable-resources [nrepl-client-map]
   (get-config nrepl-client-map :disable-resources))
 
-(defn resource-uri-enabled?
+(defn resource-name-enabled?
   "Check if a resource should be enabled based on :enable-resources and :disable-resources config.
    
    Logic:
@@ -274,13 +274,13 @@
    - If :enable-resources is provided, only those resources are enabled
    - :disable-resources is then applied to remove resources from the enabled set
    
-   Resource URIs are converted to keywords for comparison.
+   Resource names are converted to keywords for comparison.
    Both config lists can contain strings or keywords."
-  [nrepl-client-map resource-uri]
+  [nrepl-client-map resource-name]
   (let [enable-resources (get-enable-resources nrepl-client-map)
         disable-resources (get-disable-resources nrepl-client-map)
-        ;; Convert resource URI to keyword (idempotent)
-        resource-keyword (keyword resource-uri)
+        ;; Convert resource name to keyword (idempotent)
+        resource-keyword (keyword resource-name)
         ;; Convert all config entries to keywords
         enable-set (when enable-resources (set (map keyword enable-resources)))
         disable-set (when disable-resources (set (map keyword disable-resources)))]

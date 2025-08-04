@@ -414,8 +414,8 @@
         (log/debug "Enabling tool:" (:id tool))
         (add-tool mcp tool)))
     (doseq [resource resources]
-      (when (config/resource-uri-enabled? nrepl-client-map (:url resource))
-        (log/debug "Enabling resource:" (:url resource))
+      (when (config/resource-name-enabled? nrepl-client-map (:name resource))
+        (log/debug "Enabling resource:" (:name resource))
         (add-resource mcp resource)))
     (doseq [prompt prompts]
       (when (config/prompt-name-enabled? nrepl-client-map (:name prompt))

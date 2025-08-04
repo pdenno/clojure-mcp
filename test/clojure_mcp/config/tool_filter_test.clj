@@ -90,47 +90,49 @@
       (is (true? (config/prompt-name-enabled? nrepl-map "create-update-project-summary")))
       (is (true? (config/prompt-name-enabled? nrepl-map "clojure_repl_system_prompt"))))))
 
-(deftest test-resource-uri-enabled?
+(deftest test-resource-name-enabled?
   (testing "No configuration - all resources enabled"
     (let [nrepl-map {::config/config {}}]
-      (is (true? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/clojure_repl_system_prompt.md")))
-      (is (true? (config/resource-uri-enabled? nrepl-map "any-resource")))
-      (is (true? (config/resource-uri-enabled? nrepl-map :some-resource)))))
+      (is (true? (config/resource-name-enabled? nrepl-map "PROJECT_SUMMARY.md")))
+      (is (true? (config/resource-name-enabled? nrepl-map "README.md")))
+      (is (true? (config/resource-name-enabled? nrepl-map :any-resource)))))
 
   (testing "Empty enable list - no resources enabled"
     (let [nrepl-map {::config/config {:enable-resources []}}]
-      (is (false? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/clojure_repl_system_prompt.md")))
-      (is (false? (config/resource-uri-enabled? nrepl-map "any-resource")))
-      (is (false? (config/resource-uri-enabled? nrepl-map :some-resource)))))
+      (is (false? (config/resource-name-enabled? nrepl-map "PROJECT_SUMMARY.md")))
+      (is (false? (config/resource-name-enabled? nrepl-map "README.md")))
+      (is (false? (config/resource-name-enabled? nrepl-map :any-resource)))))
 
   (testing "Enable specific resources"
-    (let [nrepl-map {::config/config {:enable-resources ["prompts/clojure-mcp/clojure_repl_system_prompt.md"
-                                                         "prompts/clojure-mcp/chat_session_resume.txt"]}}]
-      (is (true? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/clojure_repl_system_prompt.md")))
-      (is (true? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/chat_session_resume.txt")))
-      (is (false? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/create_update_project_summary.md")))
-      (is (false? (config/resource-uri-enabled? nrepl-map "other-resource")))))
+    (let [nrepl-map {::config/config {:enable-resources [:PROJECT_SUMMARY.md :README.md "Clojure Project Info"]}}]
+      (is (true? (config/resource-name-enabled? nrepl-map "PROJECT_SUMMARY.md")))
+      (is (true? (config/resource-name-enabled? nrepl-map "README.md")))
+      (is (true? (config/resource-name-enabled? nrepl-map "Clojure Project Info"))) ; with spaces
+      (is (false? (config/resource-name-enabled? nrepl-map "CLAUDE.md")))
+      (is (false? (config/resource-name-enabled? nrepl-map "LLM_CODE_STYLE.md")))))
 
   (testing "Disable specific resources"
-    (let [nrepl-map {::config/config {:disable-resources ["prompts/clojure-mcp/scratch_pad_save_as.md"]}}]
-      (is (true? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/clojure_repl_system_prompt.md")))
-      (is (false? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/scratch_pad_save_as.md")))
-      (is (true? (config/resource-uri-enabled? nrepl-map "other-resource")))))
+    (let [nrepl-map {::config/config {:disable-resources [:CLAUDE.md :LLM_CODE_STYLE.md]}}]
+      (is (true? (config/resource-name-enabled? nrepl-map "PROJECT_SUMMARY.md")))
+      (is (true? (config/resource-name-enabled? nrepl-map "README.md")))
+      (is (false? (config/resource-name-enabled? nrepl-map "CLAUDE.md")))
+      (is (false? (config/resource-name-enabled? nrepl-map "LLM_CODE_STYLE.md")))))
 
   (testing "Enable and disable lists - disable takes precedence"
-    (let [nrepl-map {::config/config {:enable-resources ["prompts/clojure-mcp/clojure_repl_system_prompt.md"
-                                                         "prompts/clojure-mcp/chat_session_resume.txt"]
-                                      :disable-resources ["prompts/clojure-mcp/chat_session_resume.txt"]}}]
-      (is (true? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/clojure_repl_system_prompt.md")))
-      (is (false? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/chat_session_resume.txt"))) ; disabled even though enabled
-      (is (false? (config/resource-uri-enabled? nrepl-map "other-resource"))))) ; not in enable list
+    (let [nrepl-map {::config/config {:enable-resources [:PROJECT_SUMMARY.md :README.md :CLAUDE.md]
+                                      :disable-resources [:CLAUDE.md]}}]
+      (is (true? (config/resource-name-enabled? nrepl-map "PROJECT_SUMMARY.md")))
+      (is (true? (config/resource-name-enabled? nrepl-map "README.md")))
+      (is (false? (config/resource-name-enabled? nrepl-map "CLAUDE.md"))) ; disabled even though enabled
+      (is (false? (config/resource-name-enabled? nrepl-map "LLM_CODE_STYLE.md"))))) ; not in enable list
 
-  (testing "Resource URIs are converted to keywords for comparison"
-    (let [nrepl-map {::config/config {:enable-resources ["prompts/clojure-mcp/clojure_repl_system_prompt.md"
-                                                         "test-resource"]
+  (testing "Resource names are converted to keywords for comparison"
+    (let [nrepl-map {::config/config {:enable-resources ["PROJECT_SUMMARY.md" "README.md" "Clojure Project Info"]
                                       :disable-resources []}}]
-      (is (true? (config/resource-uri-enabled? nrepl-map "prompts/clojure-mcp/clojure_repl_system_prompt.md")))
-      ;; Even when passed as keyword internally
-      (is (true? (config/resource-uri-enabled? nrepl-map :test-resource)))))) ; simple keyword without special chars
+      (is (true? (config/resource-name-enabled? nrepl-map "PROJECT_SUMMARY.md")))
+      (is (true? (config/resource-name-enabled? nrepl-map :PROJECT_SUMMARY.md)))
+      ;; Handles resource names with spaces
+      (is (true? (config/resource-name-enabled? nrepl-map "Clojure Project Info"))))))
+
 
 

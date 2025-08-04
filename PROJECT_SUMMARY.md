@@ -173,14 +173,14 @@ your-project/
   - Applied after `enable-prompts` filtering
   - Useful for excluding specific prompts while keeping most enabled
   - Prompt names can be keywords or strings
-- `enable-resources`: List of resource URIs to enable (default: `nil` - all resources enabled)
+- `enable-resources`: List of resource names to enable (default: `nil` - all resources enabled)
   - When provided, only resources in this list are enabled
   - Empty list `[]` disables all resources
-  - Resource URIs can be keywords or strings (e.g., `"prompts/clojure-mcp/chat_session_resume.txt"`)
-- `disable-resources`: List of resource URIs to disable (default: `nil` - no resources disabled)
+  - Resource names can be keywords or strings (e.g., `"PROJECT_SUMMARY.md"` or `:README.md`)
+- `disable-resources`: List of resource names to disable (default: `nil` - no resources disabled)
   - Applied after `enable-resources` filtering
   - Useful for excluding specific resources while keeping most enabled
-  - Resource URIs can be keywords or strings
+  - Resource names can be keywords or strings
 - `models`: Map of custom model configurations (default: `{}`)
   - Define named model configurations for LangChain4j integration
   - Keys are namespaced keywords like `:openai/my-gpt4` or `:anthropic/my-claude`
@@ -201,9 +201,8 @@ your-project/
  :disable-tools [:dispatch-agent :architect]
  :enable-prompts [:clojure_repl_system_prompt :chat-session-summarize]
  :disable-prompts [:scratch-pad-save-as]
- :enable-resources ["prompts/clojure-mcp/clojure_repl_system_prompt.md"
-                    "prompts/clojure-mcp/chat_session_resume.txt"]
- :disable-resources ["prompts/clojure-mcp/scratch_pad_save_as.md"]
+ :enable-resources [:PROJECT_SUMMARY.md :README.md]
+ :disable-resources [:CLAUDE.md :LLM_CODE_STYLE.md]
  :models {:openai/my-fast {:model-name "gpt-4o"
                            :temperature 0.3
                            :max-tokens 2048
