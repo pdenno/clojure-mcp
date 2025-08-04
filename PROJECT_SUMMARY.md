@@ -168,8 +168,7 @@ your-project/
 - `enable-prompts`: List of prompt names to enable (default: `nil` - all prompts enabled)
   - When provided, only prompts in this list are enabled
   - Empty list `[]` disables all prompts
-  - Prompt names can be keywords or strings (e.g., `:chat-session-summarize` or `"chat_session_summarize"`)
-  - Underscores in prompt names are normalized to hyphens
+  - Prompt names can be keywords or strings (e.g., `:chat-session-summarize` or `"chat-session-summarize"`)
 - `disable-prompts`: List of prompt names to disable (default: `nil` - no prompts disabled)
   - Applied after `enable-prompts` filtering
   - Useful for excluding specific prompts while keeping most enabled
@@ -192,7 +191,7 @@ your-project/
  :scratch-pad-file "scratch_pad.edn"
  :enable-tools [:clojure-eval :read-file :file-write :grep :glob-files]
  :disable-tools [:dispatch-agent :architect]
- :enable-prompts [:clojure-repl-system-prompt :chat-session-summarize]
+ :enable-prompts [:clojure_repl_system_prompt :chat-session-summarize]
  :disable-prompts [:scratch-pad-save-as]
  :models {:openai/my-fast {:model-name "gpt-4o"
                            :temperature 0.3

@@ -243,18 +243,11 @@
   [nrepl-client-map prompt-name]
   (let [enable-prompts (get-enable-prompts nrepl-client-map)
         disable-prompts (get-disable-prompts nrepl-client-map)
-        ;; Convert prompt name to keyword (handle underscores to hyphens)
-        ;; Use name for keywords, str for strings
-        prompt-str (if (keyword? prompt-name) (name prompt-name) (str prompt-name))
-        prompt-keyword (-> prompt-str
-                           (str/replace "_" "-")
-                           keyword)
-        ;; Normalize keywords in config lists (replace underscores with hyphens)
-        normalize-keyword (fn [k]
-                            (let [k-str (if (keyword? k) (name k) (str k))]
-                              (-> k-str (str/replace "_" "-") keyword)))
-        enable-set (when enable-prompts (set (map normalize-keyword enable-prompts)))
-        disable-set (when disable-prompts (set (map normalize-keyword disable-prompts)))]
+        ;; Convert prompt name to keyword (idempotent)
+        prompt-keyword (keyword prompt-name)
+        ;; Convert all config entries to keywords
+        enable-set (when enable-prompts (set (map keyword enable-prompts)))
+        disable-set (when disable-prompts (set (map keyword disable-prompts)))]
     (cond
       ;; If enable is empty list [], nothing is enabled
       (and (some? enable-prompts) (empty? enable-prompts)) false
