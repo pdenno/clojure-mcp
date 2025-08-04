@@ -84,8 +84,18 @@ All unused tools have corresponding test files moved to `/test/clojure_mcp/other
 - `/resources/prompts/`: System prompts for AI assistants
 - `/resources/prompts/system/`: Core system prompts
 - `/resources/agent/`: Agent-specific resources
-- `/resources/configs/`: Configuration examples
 - `/resources/logback.xml`: Logging configuration file
+
+### Documentation
+
+- `/doc/README.md`: Documentation overview
+- `/doc/custom-mcp-server.md`: Guide for creating custom MCP servers
+- `/doc/model-configuration.md`: Guide for configuring custom LLM models
+- `/doc/creating-tools-multimethod.md`: Guide for creating tools with multimethods
+- `/doc/creating-tools-without-clojuremcp.md`: Guide for creating standalone tools
+- `/doc/creating-prompts.md`: Guide for creating custom prompts
+- `/doc/creating-resources.md`: Guide for creating custom resources
+- `/doc/gen-your-mcp-server.md`: Guide for generating MCP servers
 
 ## Dependencies and Versions
 
