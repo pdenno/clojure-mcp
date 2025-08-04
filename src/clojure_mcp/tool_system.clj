@@ -82,6 +82,7 @@
 ;; Default implementation for registration-map
 (defmethod registration-map :default [tool-config]
   {:name (tool-name tool-config)
+   :id (keyword (tool-name tool-config))
    :description (tool-description tool-config)
    :schema (tool-schema tool-config)
    :tool-fn (fn [_ params callback]

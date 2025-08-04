@@ -157,6 +157,14 @@ your-project/
 - `scratch-pad-file`: Filename for scratch pad persistence (default: `"scratch_pad.edn"`)
   - Specifies the filename within `.clojure-mcp/` directory
   - Only used when `scratch-pad-load` is `true`
+- `enable-tools`: List of tool IDs to enable (default: `nil` - all tools enabled)
+  - When provided, only tools in this list are enabled
+  - Empty list `[]` disables all tools
+  - Tool IDs can be keywords or strings (e.g., `:clojure-eval` or `"clojure-eval"`)
+- `disable-tools`: List of tool IDs to disable (default: `nil` - no tools disabled)
+  - Applied after `enable-tools` filtering
+  - Useful for excluding specific tools while keeping most enabled
+  - Tool IDs can be keywords or strings
 - `models`: Map of custom model configurations (default: `{}`)
   - Define named model configurations for LangChain4j integration
   - Keys are namespaced keywords like `:openai/my-gpt4` or `:anthropic/my-claude`
@@ -173,6 +181,8 @@ your-project/
  :bash-over-nrepl true
  :scratch-pad-load false
  :scratch-pad-file "scratch_pad.edn"
+ :enable-tools [:clojure-eval :read-file :file-write :grep :glob-files]
+ :disable-tools [:dispatch-agent :architect]
  :models {:openai/my-fast {:model-name "gpt-4o"
                            :temperature 0.3
                            :max-tokens 2048

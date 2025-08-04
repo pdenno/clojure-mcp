@@ -410,7 +410,9 @@
                   (doall (make-prompts-fn nrepl-client-atom working-dir)))
         mcp (mcp-server)]
     (doseq [tool tools]
-      (add-tool mcp tool))
+      (when (config/tool-id-enabled? nrepl-client-map (:id tool))
+        (log/debug "Enabling tool:" (:id tool))
+        (add-tool mcp tool)))
     (doseq [resource resources]
       (add-resource mcp resource))
     (doseq [prompt prompts]

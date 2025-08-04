@@ -188,6 +188,40 @@
         (log/warn "Invalid :dispatch-agent-context value, defaulting to true")
         true))))
 
+(defn get-enable-tools [nrepl-client-map]
+  (get-config nrepl-client-map :enable-tools))
+
+(defn get-disable-tools [nrepl-client-map]
+  (get-config nrepl-client-map :disable-tools))
+
+(defn tool-id-enabled?
+  "Check if a tool should be enabled based on :enable-tools and :disable-tools config.
+   
+   Logic:
+   - If :enable-tools is nil, all tools are enabled (unless in :disable-tools)
+   - If :enable-tools is [], no tools are enabled
+   - If :enable-tools is provided, only those tools are enabled
+   - :disable-tools is then applied to remove tools from the enabled set
+   
+   Both config lists can contain strings or keywords - they are normalized to keywords."
+  [nrepl-client-map tool-id]
+  (let [enable-tools (get-enable-tools nrepl-client-map)
+        disable-tools (get-disable-tools nrepl-client-map)
+        ;; Normalize tool-id to keyword
+        tool-id (if (string? tool-id) (keyword tool-id) tool-id)
+        enable-set (when enable-tools (set (map keyword enable-tools)))
+        disable-set (when disable-tools (set (map keyword disable-tools)))]
+    (cond
+      ;; If enable is empty list [], nothing is enabled
+      (and (some? enable-tools) (empty? enable-tools)) false
+
+      ;; If enable is nil, all are enabled (unless in disable list)
+      (nil? enable-tools) (not (contains? disable-set tool-id))
+
+      ;; If enable is provided, check if tool is in enable list AND not in disable list
+      :else (and (contains? enable-set tool-id)
+                 (not (contains? disable-set tool-id))))))
+
 (defn set-config*
   "Sets a config value in a map. Returns the updated map.
    This is the core function that set-config! uses."
