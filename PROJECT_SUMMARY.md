@@ -165,6 +165,15 @@ your-project/
   - Applied after `enable-tools` filtering
   - Useful for excluding specific tools while keeping most enabled
   - Tool IDs can be keywords or strings
+- `enable-prompts`: List of prompt names to enable (default: `nil` - all prompts enabled)
+  - When provided, only prompts in this list are enabled
+  - Empty list `[]` disables all prompts
+  - Prompt names can be keywords or strings (e.g., `:chat-session-summarize` or `"chat_session_summarize"`)
+  - Underscores in prompt names are normalized to hyphens
+- `disable-prompts`: List of prompt names to disable (default: `nil` - no prompts disabled)
+  - Applied after `enable-prompts` filtering
+  - Useful for excluding specific prompts while keeping most enabled
+  - Prompt names can be keywords or strings
 - `models`: Map of custom model configurations (default: `{}`)
   - Define named model configurations for LangChain4j integration
   - Keys are namespaced keywords like `:openai/my-gpt4` or `:anthropic/my-claude`
@@ -183,6 +192,8 @@ your-project/
  :scratch-pad-file "scratch_pad.edn"
  :enable-tools [:clojure-eval :read-file :file-write :grep :glob-files]
  :disable-tools [:dispatch-agent :architect]
+ :enable-prompts [:clojure-repl-system-prompt :chat-session-summarize]
+ :disable-prompts [:scratch-pad-save-as]
  :models {:openai/my-fast {:model-name "gpt-4o"
                            :temperature 0.3
                            :max-tokens 2048

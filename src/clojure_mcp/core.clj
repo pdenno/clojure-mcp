@@ -416,6 +416,8 @@
     (doseq [resource resources]
       (add-resource mcp resource))
     (doseq [prompt prompts]
-      (add-prompt mcp prompt))
+      (when (config/prompt-name-enabled? nrepl-client-map (:name prompt))
+        (log/debug "Enabling prompt:" (:name prompt))
+        (add-prompt mcp prompt)))
     (swap! nrepl-client-atom assoc :mcp-server mcp)
     nil))

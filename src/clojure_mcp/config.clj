@@ -1,6 +1,7 @@
 (ns clojure-mcp.config
   (:require
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [clojure-mcp.dialects :as dialects]
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]))
@@ -221,6 +222,49 @@
       ;; If enable is provided, check if tool is in enable list AND not in disable list
       :else (and (contains? enable-set tool-id)
                  (not (contains? disable-set tool-id))))))
+
+(defn get-enable-prompts [nrepl-client-map]
+  (get-config nrepl-client-map :enable-prompts))
+
+(defn get-disable-prompts [nrepl-client-map]
+  (get-config nrepl-client-map :disable-prompts))
+
+(defn prompt-name-enabled?
+  "Check if a prompt should be enabled based on :enable-prompts and :disable-prompts config.
+   
+   Logic:
+   - If :enable-prompts is nil, all prompts are enabled (unless in :disable-prompts)
+   - If :enable-prompts is [], no prompts are enabled
+   - If :enable-prompts is provided, only those prompts are enabled
+   - :disable-prompts is then applied to remove prompts from the enabled set
+   
+   Prompt names are converted to keywords for comparison.
+   Both config lists can contain strings or keywords."
+  [nrepl-client-map prompt-name]
+  (let [enable-prompts (get-enable-prompts nrepl-client-map)
+        disable-prompts (get-disable-prompts nrepl-client-map)
+        ;; Convert prompt name to keyword (handle underscores to hyphens)
+        ;; Use name for keywords, str for strings
+        prompt-str (if (keyword? prompt-name) (name prompt-name) (str prompt-name))
+        prompt-keyword (-> prompt-str
+                           (str/replace "_" "-")
+                           keyword)
+        ;; Normalize keywords in config lists (replace underscores with hyphens)
+        normalize-keyword (fn [k]
+                            (let [k-str (if (keyword? k) (name k) (str k))]
+                              (-> k-str (str/replace "_" "-") keyword)))
+        enable-set (when enable-prompts (set (map normalize-keyword enable-prompts)))
+        disable-set (when disable-prompts (set (map normalize-keyword disable-prompts)))]
+    (cond
+      ;; If enable is empty list [], nothing is enabled
+      (and (some? enable-prompts) (empty? enable-prompts)) false
+
+      ;; If enable is nil, all are enabled (unless in disable list)
+      (nil? enable-prompts) (not (contains? disable-set prompt-keyword))
+
+      ;; If enable is provided, check if prompt is in enable list AND not in disable list
+      :else (and (contains? enable-set prompt-keyword)
+                 (not (contains? disable-set prompt-keyword))))))
 
 (defn set-config*
   "Sets a config value in a map. Returns the updated map.
