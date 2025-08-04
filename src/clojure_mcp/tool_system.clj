@@ -20,6 +20,11 @@
       name
       (string/replace "-" "_")))
 
+(defmulti tool-id :tool-type)
+
+(defmethod tool-id :default [tool-config]
+  (keyword (tool-name tool-config)))
+
 (defmulti tool-description
   "Returns the description of the tool as a string. Dispatches on :tool-type."
   :tool-type)
@@ -82,7 +87,7 @@
 ;; Default implementation for registration-map
 (defmethod registration-map :default [tool-config]
   {:name (tool-name tool-config)
-   :id (keyword (tool-name tool-config))
+   :id (tool-id tool-config)
    :description (tool-description tool-config)
    :schema (tool-schema tool-config)
    :tool-fn (fn [_ params callback]
