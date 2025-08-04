@@ -259,6 +259,42 @@
       :else (and (contains? enable-set prompt-keyword)
                  (not (contains? disable-set prompt-keyword))))))
 
+(defn get-enable-resources [nrepl-client-map]
+  (get-config nrepl-client-map :enable-resources))
+
+(defn get-disable-resources [nrepl-client-map]
+  (get-config nrepl-client-map :disable-resources))
+
+(defn resource-uri-enabled?
+  "Check if a resource should be enabled based on :enable-resources and :disable-resources config.
+   
+   Logic:
+   - If :enable-resources is nil, all resources are enabled (unless in :disable-resources)
+   - If :enable-resources is [], no resources are enabled
+   - If :enable-resources is provided, only those resources are enabled
+   - :disable-resources is then applied to remove resources from the enabled set
+   
+   Resource URIs are converted to keywords for comparison.
+   Both config lists can contain strings or keywords."
+  [nrepl-client-map resource-uri]
+  (let [enable-resources (get-enable-resources nrepl-client-map)
+        disable-resources (get-disable-resources nrepl-client-map)
+        ;; Convert resource URI to keyword (idempotent)
+        resource-keyword (keyword resource-uri)
+        ;; Convert all config entries to keywords
+        enable-set (when enable-resources (set (map keyword enable-resources)))
+        disable-set (when disable-resources (set (map keyword disable-resources)))]
+    (cond
+      ;; If enable is empty list [], nothing is enabled
+      (and (some? enable-resources) (empty? enable-resources)) false
+
+      ;; If enable is nil, all are enabled (unless in disable list)
+      (nil? enable-resources) (not (contains? disable-set resource-keyword))
+
+      ;; If enable is provided, check if resource is in enable list AND not in disable list
+      :else (and (contains? enable-set resource-keyword)
+                 (not (contains? disable-set resource-keyword))))))
+
 (defn set-config*
   "Sets a config value in a map. Returns the updated map.
    This is the core function that set-config! uses."
