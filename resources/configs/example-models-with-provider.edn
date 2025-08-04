@@ -1,0 +1,46 @@
+;; Example .clojure-mcp/config.edn with custom model configurations
+
+{;; Custom model configurations
+ :models {;; Traditional approach - provider from namespace
+          :openai/my-fast-gpt {:model-name "gpt-4o"
+                               :temperature 0.3
+                               :max-tokens 2048}
+
+          ;; Explicit provider - allows custom namespaces
+          :company/production-llm {:provider :openai
+                                   :model-name "gpt-4o"
+                                   :temperature 0.7
+                                   :max-tokens 4096}
+
+          :team/code-assistant {:provider :anthropic
+                                :model-name "claude-3-5-sonnet-20241022"
+                                :temperature 0.2
+                                :max-tokens 8192}
+
+          ;; Provider override - useful for services like Azure OpenAI
+          :openai/azure-gpt {:provider :openai ; Still uses OpenAI provider
+                             :model-name "gpt-4"
+                             :base-url [:env "AZURE_OPENAI_URL"]
+                             :api-key [:env "AZURE_API_KEY"]}
+
+          ;; Environment variable references
+          :prod/main-model {:provider :google
+                            :model-name [:env "PROD_MODEL_NAME"]
+                            :api-key [:env "GEMINI_API_KEY"]
+                            :temperature 0.5
+                            :max-tokens 4096}
+
+          ;; Reasoning models with thinking config
+          :company/reasoning-llm {:provider :anthropic
+                                  :model-name "claude-3-5-sonnet-20241022"
+                                  :max-tokens 8192
+                                  :thinking {:enabled true
+                                             :return true
+                                             :send true
+                                             :budget-tokens 4096}}}
+
+ ;; Other configuration options
+ :allowed-directories ["."]
+ :cljfmt true
+ :bash-over-nrepl true
+ :scratch-pad-load false}

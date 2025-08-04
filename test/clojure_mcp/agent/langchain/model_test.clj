@@ -181,14 +181,60 @@
              (.getName (.getClass model)))))))
 
 (deftest test-multimethod-dispatch
-  (testing "Multimethod dispatches correctly"
-    (is (model/create-builder :openai {}) "OpenAI dispatch")
-    (is (model/create-builder :google {}) "Google dispatch")
-    (is (model/create-builder :anthropic {}) "Anthropic dispatch")
+  (testing "Multimethod dispatches correctly based on config :provider"
+    (is (model/create-builder {:provider :openai}) "OpenAI dispatch")
+    (is (model/create-builder {:provider :google}) "Google dispatch")
+    (is (model/create-builder {:provider :anthropic}) "Anthropic dispatch")
 
     (testing "Unknown provider throws exception"
       (is (thrown-with-msg? Exception #"Unknown provider"
-                            (model/create-builder :unknown {}))))))
+                            (model/create-builder {:provider :unknown}))))))
+
+(deftest test-provider-config-support
+  (testing "Provider extracted from model key namespace by default"
+    (let [builder (model/create-model-builder :openai/gpt-4o {})]
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+  (testing "Explicit provider in config takes precedence"
+    (let [user-models {:company/fast-llm {:provider :openai
+                                          :model-name "gpt-4o"
+                                          :temperature 0.3}}
+          nrepl-client-map {::config/config {:models user-models}}
+          builder (model/create-model-builder-from-config
+                   nrepl-client-map
+                   :company/fast-llm
+                   {})]
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+  (testing "Provider override - e.g. Azure OpenAI"
+    (let [user-models {:openai/azure-gpt {:provider :openai ; Could be :azure if we had that provider
+                                          :model-name "gpt-4"
+                                          :base-url "https://myorg.openai.azure.com/"}}
+          nrepl-client-map {::config/config {:models user-models}}
+          builder (model/create-model-builder-from-config
+                   nrepl-client-map
+                   :openai/azure-gpt
+                   {})]
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+  (testing "create-builder-from-config with provider in config"
+    (let [config {:provider :google
+                  :model-name "gemini-pro"
+                  :temperature 0.5}
+          builder (model/create-builder-from-config :ignored config)]
+      (is (instance? GoogleAiGeminiChatModel$GoogleAiGeminiChatModelBuilder builder))
+      (is "Provider in config takes precedence over first arg")))
+
+  (testing "Provider validation with explicit provider"
+    (let [user-models {:company/bad-model {:provider :openai
+                                           :temperature 3.0}} ; Invalid temp
+          nrepl-client-map {::config/config {:models user-models}}]
+      (is (thrown-with-msg? Exception #"Invalid configuration"
+                            (model/create-model-builder-from-config
+                             nrepl-client-map
+                             :company/bad-model
+                             {}
+                             {:validate? true}))))))
 
 (deftest test-multimethod-extensibility
   (testing "Multimethod can be extended with new providers"
@@ -197,14 +243,14 @@
 
     ;; Extend with a test provider
     (model/extend-provider :test-provider
-                           (fn [_ config]
+                           (fn [config]
         ;; Return a mock builder (using OpenAI as stand-in)
                              (-> (dev.langchain4j.model.openai.OpenAiChatModel/builder)
                                  (.modelName "test-model")
                                  (.apiKey (:api-key config "test-key")))))
 
     ;; Test the extended provider
-    (let [builder (model/create-builder :test-provider {:temperature 0.5})]
+    (let [builder (model/create-builder {:provider :test-provider :temperature 0.5})]
       (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder)))
 
     ;; Clean up - remove the test method
@@ -281,7 +327,7 @@
 
   (testing "Invalid model keys are rejected"
     (is (thrown-with-msg? Exception #"Invalid model key"
-                          (model/create-model-builder :invalid/model-key
+                          (model/create-model-builder :model-without-namespace
                                                       {}
                                                       {:validate? true}))))
 

@@ -74,10 +74,10 @@
                             (spec/validate-config invalid-config)))))
 
   (testing "validate-config-for-provider function"
-    (is (spec/validate-config-for-provider :openai {:seed 42}))
-    (is (spec/validate-config-for-provider :anthropic {:top-k 100}))
+    (is (spec/validate-config-for-provider {:provider :openai :seed 42}))
+    (is (spec/validate-config-for-provider {:provider :anthropic :top-k 100}))
     (is (thrown-with-msg? Exception #"Invalid configuration for provider"
-                          (spec/validate-config-for-provider :openai {:temperature 3.0})))))
+                          (spec/validate-config-for-provider {:provider :openai :temperature 3.0})))))
 
 (deftest test-explain-config
   (testing "Explanation for invalid configs"
@@ -108,17 +108,35 @@
       (is (= -0.5 (:presence-penalty coerced))))))
 
 (deftest test-model-key-validation
-  (testing "Valid model keys"
+  (testing "Valid model keys - must have namespace"
     (is (s/valid? ::spec/model-key :openai/gpt-4))
     (is (s/valid? ::spec/model-key :google/gemini-pro))
-    (is (s/valid? ::spec/model-key :anthropic/claude-3)))
+    (is (s/valid? ::spec/model-key :anthropic/claude-3))
+    (is (s/valid? ::spec/model-key :company/custom-model))
+    (is (s/valid? ::spec/model-key :my-org/llm)))
 
-  (testing "Invalid model keys"
-    (is (not (s/valid? ::spec/model-key :invalid/model)))
+  (testing "Invalid model keys - no namespace"
     (is (not (s/valid? ::spec/model-key :model-without-namespace)))
     (is (not (s/valid? ::spec/model-key "not-a-keyword"))))
 
   (testing "validate-model-key function"
     (is (= :openai/gpt-4 (spec/validate-model-key :openai/gpt-4)))
+    (is (= :company/model (spec/validate-model-key :company/model)))
     (is (thrown-with-msg? Exception #"Invalid model key"
-                          (spec/validate-model-key :unknown/model)))))
+                          (spec/validate-model-key :no-namespace)))))
+
+(deftest test-provider-in-config-spec
+  (testing "Provider is valid in model config"
+    (is (s/valid? ::spec/model-config {:provider :openai
+                                       :model-name "gpt-4o"
+                                       :temperature 0.7}))
+    (is (s/valid? ::spec/model-config {:provider :google
+                                       :model-name "gemini-pro"}))
+    (is (s/valid? ::spec/model-config {:provider :anthropic
+                                       :model-name "claude-3"})))
+
+  (testing "Invalid provider in config"
+    (is (not (s/valid? ::spec/model-config {:provider :unknown-provider
+                                            :model-name "test"})))
+    (is (not (s/valid? ::spec/model-config {:provider "openai"
+                                            :model-name "test"})))))

@@ -118,6 +118,7 @@
                    ::api-key
                    ::base-url
                    ::model-name
+                   ::provider
                    ::temperature
                    ::top-p
                    ::top-k
@@ -171,10 +172,11 @@
                      :config config}))))
 
 (defn validate-config-for-provider
-  "Validates a model configuration for a specific provider.
-   Provider should be :anthropic, :google, or :openai."
-  [provider config]
-  (let [spec (case provider
+  "Validates a model configuration for its specified provider.
+   Provider is extracted from the config's :provider key."
+  [config]
+  (let [provider (:provider config)
+        spec (case provider
                :anthropic ::anthropic-config
                :google ::google-config
                :openai ::openai-config
@@ -194,9 +196,11 @@
     (s/explain-str ::model-config config)))
 
 (defn explain-config-for-provider
-  "Returns a human-readable explanation for provider-specific config validation."
-  [provider config]
-  (let [spec (case provider
+  "Returns a human-readable explanation for provider-specific config validation.
+   Provider is extracted from the config's :provider key."
+  [config]
+  (let [provider (:provider config)
+        spec (case provider
                :anthropic ::anthropic-config
                :google ::google-config
                :openai ::openai-config
@@ -257,16 +261,15 @@
 
 (s/def ::provider valid-providers)
 (s/def ::model-key (s/and keyword?
-                          #(contains? valid-providers (-> % namespace keyword))))
+                          namespace)) ; Just require it has a namespace
 
 (defn validate-model-key
-  "Validates that a model key has a valid provider namespace."
+  "Validates that a model key has a namespace."
   [model-key]
   (if (s/valid? ::model-key model-key)
     model-key
-    (throw (ex-info "Invalid model key"
+    (throw (ex-info "Invalid model key - must have a namespace"
                     {:model-key model-key
-                     :valid-providers valid-providers
                      :explain (s/explain-str ::model-key model-key)}))))
 
 ;; ============================================================================

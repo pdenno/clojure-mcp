@@ -202,13 +202,21 @@
         (assoc config :api-key api-key)
         config))))
 
+(defn- ensure-provider
+  "Ensures provider is present in config, extracting from model-key if needed.
+   If config already has :provider, that takes precedence."
+  [config model-key]
+  (if (:provider config)
+    config
+    (assoc config :provider (get-provider model-key))))
+
 ;; Multimethod for creating model builders based on provider
 (defmulti create-builder
-  "Creates a model builder for the given provider and config.
+  "Creates a model builder for the given config.
    Returns the builder object without calling .build()
    
-   Dispatches on provider keyword (:anthropic, :google, :openai, etc.)"
-  (fn [provider config] provider))
+   Dispatches on :provider in config (:anthropic, :google, :openai, etc.)"
+  (fn [config] (:provider config)))
 
 ;; Helper function for applying common parameters
 (defn- apply-common-params [builder config]
@@ -226,7 +234,7 @@
 
 ;; Anthropic implementation
 (defmethod create-builder :anthropic
-  [_ config]
+  [config]
   (let [builder (AnthropicChatModel/builder)]
     (-> builder
         (apply-common-params config)
@@ -260,7 +268,7 @@
           (.build)))))
 
 (defmethod create-builder :google
-  [_ config]
+  [config]
   (let [builder (GoogleAiGeminiChatModel/builder)]
     (-> builder
         (apply-common-params config)
@@ -300,7 +308,7 @@
     builder))
 
 (defmethod create-builder :openai
-  [_ config]
+  [config]
   (let [builder (OpenAiChatModel/builder)]
     (-> builder
         (apply-common-params config)
@@ -339,8 +347,8 @@
 
 ;; Default implementation for unknown providers
 (defmethod create-builder :default
-  [provider _]
-  (throw (ex-info "Unknown provider" {:provider provider})))
+  [config]
+  (throw (ex-info "Unknown provider" {:provider (:provider config)})))
 
 ;; Public API functions
 
@@ -360,21 +368,22 @@
   ([model-key config-overrides]
    (create-model-builder model-key config-overrides {:validate? true}))
   ([model-key config-overrides {:keys [validate?] :or {validate? true}}]
-   (let [provider (get-provider model-key)
-         ;; Resolve env refs in config overrides
+   (let [;; Resolve env refs in config overrides
          resolved-overrides (resolve-env-refs config-overrides)
-         config (-> (merge-with-defaults model-key resolved-overrides)
+         base-config (merge-with-defaults model-key resolved-overrides)
+         config (-> base-config
                     (resolve-env-refs) ; Also resolve any env refs from defaults
-                    (ensure-api-key provider))]
+                    (ensure-provider model-key)
+                    (as-> cfg (ensure-api-key cfg (:provider cfg))))]
      ;; Validate if requested
      (when validate?
        (spec/validate-model-key model-key)
-       (spec/validate-config-for-provider provider config))
-     (create-builder provider config))))
+       (spec/validate-config-for-provider config))
+     (create-builder config))))
 
 (defn create-builder-from-config
   "Creates a model builder from a complete configuration map without defaults.
-   Provider must be specified explicitly.
+   Provider must be specified either as first arg or in config's :provider key.
    
    Options:
    - :validate? - When true, validates config against specs (default: true)
@@ -385,11 +394,15 @@
   ([provider config {:keys [validate?] :or {validate? true}}]
    (let [;; Resolve env refs in config
          resolved-config (resolve-env-refs config)
-         final-config (ensure-api-key resolved-config provider)]
+         ;; Use provider from config if present, otherwise use arg
+         final-provider (or (:provider resolved-config) provider)
+         final-config (-> resolved-config
+                          (assoc :provider final-provider)
+                          (ensure-api-key final-provider))]
      ;; Validate if requested
      (when validate?
-       (spec/validate-config-for-provider provider final-config))
-     (create-builder provider final-config))))
+       (spec/validate-config-for-provider final-config))
+     (create-builder final-config))))
 
 (defn build-model
   "Convenience function that creates a model builder and builds it immediately.
@@ -423,14 +436,14 @@
    
    Usage:
    (extend-provider :my-provider 
-     (fn [_ config]
+     (fn [config]
        (-> (MyProviderModel/builder)
            (apply-common-params config)
            ...)))"
   [provider builder-fn]
   (defmethod create-builder provider
-    [p c]
-    (builder-fn p c)))
+    [c]
+    (builder-fn c)))
 
 (defn create-model-builder-from-config
   "Creates a model builder using configuration from nrepl-client-map.
@@ -463,17 +476,19 @@
          resolved-base (resolve-env-refs base-config)
          resolved-overrides (resolve-env-refs config-overrides)
          ;; Merge resolved configs
-         config (merge resolved-base resolved-overrides)
-         ;; Extract provider from model key
-         provider (get-provider model-key)
+         merged-config (merge resolved-base resolved-overrides)
+         ;; Ensure provider is set (from config or model-key)
+         config-with-provider (ensure-provider merged-config model-key)
+         ;; Extract provider for API key
+         provider (:provider config-with-provider)
          ;; Ensure API key
-         final-config (ensure-api-key config provider)]
+         final-config (ensure-api-key config-with-provider provider)]
      ;; Validate if requested
      (when validate?
        (spec/validate-model-key model-key)
-       (spec/validate-config-for-provider provider final-config))
+       (spec/validate-config-for-provider final-config))
      ;; Create builder
-     (create-builder provider final-config))))
+     (create-builder final-config))))
 
 (defn create-model-from-config
   "Convenience function that creates and builds a model using configuration from nrepl-client-map.
