@@ -1,6 +1,7 @@
 (ns clojure-mcp.agent.langchain.model
   (:require
-   [clojure.string :as string])
+   [clojure.string :as string]
+   [clojure-mcp.agent.langchain.model-spec :as spec])
   (:import
    [dev.langchain4j.model.anthropic
     AnthropicChatModel
@@ -305,38 +306,60 @@
                          {:api-key \"...\" 
                           :thinking {:effort :high}})
    
+   Options:
+   - :validate? - When true, validates config against specs (default: true)
+   
    Returns a builder object. Call .build() on it to get the final model."
-  [model-key config-overrides]
-  (let [provider (get-provider model-key)
-        config (-> (merge-with-defaults model-key config-overrides)
-                   (ensure-api-key provider))]
-    (create-builder provider config)))
+  ([model-key config-overrides]
+   (create-model-builder model-key config-overrides {:validate? true}))
+  ([model-key config-overrides {:keys [validate?] :or {validate? true}}]
+   (let [provider (get-provider model-key)
+         config (-> (merge-with-defaults model-key config-overrides)
+                    (ensure-api-key provider))]
+     ;; Validate if requested
+     (when validate?
+       (spec/validate-model-key model-key)
+       (spec/validate-config-for-provider provider config))
+     (create-builder provider config))))
 
 (defn create-builder-from-config
   "Creates a model builder from a complete configuration map without defaults.
    Provider must be specified explicitly.
    
+   Options:
+   - :validate? - When true, validates config against specs (default: true)
+   
    Returns a builder object. Call .build() on it to get the final model."
-  [provider config]
-  (let [config (ensure-api-key config provider)]
-    (create-builder provider config)))
+  ([provider config]
+   (create-builder-from-config provider config {:validate? true}))
+  ([provider config {:keys [validate?] :or {validate? true}}]
+   (let [config (ensure-api-key config provider)]
+     ;; Validate if requested
+     (when validate?
+       (spec/validate-config-for-provider provider config))
+     (create-builder provider config))))
 
 (defn build-model
   "Convenience function that creates a model builder and builds it immediately.
    
    Usage:
    (build-model :openai/o4-mini {:temperature 0.5})
+   (build-model :openai/o4-mini {:temperature 0.5} {:validate? false})
    
    Returns a fully built model ready for use."
-  [model-key config-overrides]
-  (.build (create-model-builder model-key config-overrides)))
+  ([model-key config-overrides]
+   (.build (create-model-builder model-key config-overrides)))
+  ([model-key config-overrides options]
+   (.build (create-model-builder model-key config-overrides options))))
 
 (defn build-model-from-config
   "Convenience function that creates and builds a model from config.
    
    Returns a fully built model ready for use."
-  [provider config]
-  (.build (create-builder-from-config provider config)))
+  ([provider config]
+   (.build (create-builder-from-config provider config)))
+  ([provider config options]
+   (.build (create-builder-from-config provider config options))))
 
 (defn available-models
   "Returns a list of available model keys with default configurations."

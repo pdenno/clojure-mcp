@@ -17,7 +17,12 @@
       ;; OpenAI models
       (is (contains? (set models) :openai/gpt-4o))
       (is (contains? (set models) :openai/gpt-4-1))
+      (is (contains? (set models) :openai/gpt-4-1-mini))
+      (is (contains? (set models) :openai/gpt-4-1-nano))
+      (is (contains? (set models) :openai/o1))
+      (is (contains? (set models) :openai/o1-mini))
       (is (contains? (set models) :openai/o3))
+      (is (contains? (set models) :openai/o3-mini))
       (is (contains? (set models) :openai/o3-pro))
       (is (contains? (set models) :openai/o4-mini))
       (is (contains? (set models) :openai/o4-mini-reasoning))
@@ -33,7 +38,7 @@
       (is (contains? (set models) :anthropic/claude-3-5-haiku))
       (is (contains? (set models) :anthropic/claude-sonnet-4))
       (is (contains? (set models) :anthropic/claude-sonnet-4-reasoning))
-      (is (= 16 (count models))))))
+      (is (= 21 (count models))))))
 
 (deftest test-get-provider
   (testing "Provider extraction from model keys"
@@ -94,11 +99,11 @@
       (is (instance? AnthropicChatModel$AnthropicChatModelBuilder opus))
       (is (instance? AnthropicChatModel$AnthropicChatModelBuilder haiku))))
 
-  (testing "O3 models have high reasoning effort"
+  (testing "O3 models have medium reasoning effort"
     (let [o3-config (model/merge-with-defaults :openai/o3 {})
           o3-pro-config (model/merge-with-defaults :openai/o3-pro {})]
-      (is (= :high (get-in o3-config [:thinking :effort])))
-      (is (= :high (get-in o3-pro-config [:thinking :effort])))))
+      (is (= :medium (get-in o3-config [:thinking :effort])))
+      (is (= :medium (get-in o3-pro-config [:thinking :effort])))))
 
   (testing "Haiku has lower max tokens"
     (let [haiku-config (model/merge-with-defaults :anthropic/claude-3-5-haiku {})]
@@ -254,3 +259,37 @@
                    {:model-name "claude-3"
                     :max-tokens 1000})]
       (is (instance? AnthropicChatModel$AnthropicChatModelBuilder builder)))))
+
+(deftest test-spec-validation
+  (testing "Valid configs pass validation"
+    (is (model/create-model-builder :openai/gpt-4o
+                                    {:temperature 0.7
+                                     :max-tokens 2048})))
+
+  (testing "Invalid configs are rejected with validation enabled"
+    (is (thrown-with-msg? Exception #"Invalid configuration"
+                          (model/create-model-builder :openai/gpt-4o
+                                                      {:temperature 3.0} ; > 2.0
+                                                      {:validate? true}))))
+
+  (testing "Invalid configs pass when validation is disabled"
+    (let [builder (model/create-model-builder :openai/gpt-4o
+                                              {:temperature 3.0}
+                                              {:validate? false})]
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+  (testing "Invalid model keys are rejected"
+    (is (thrown-with-msg? Exception #"Invalid model key"
+                          (model/create-model-builder :invalid/model-key
+                                                      {}
+                                                      {:validate? true}))))
+
+  (testing "Provider-specific validation"
+    ;; Top-k is valid for Anthropic
+    (is (model/create-model-builder :anthropic/claude-sonnet-4
+                                    {:top-k 50}))
+
+    ;; Invalid thinking effort is rejected
+    (is (thrown-with-msg? Exception #"Invalid configuration"
+                          (model/create-model-builder :openai/o3
+                                                      {:thinking {:effort :extreme}})))))
