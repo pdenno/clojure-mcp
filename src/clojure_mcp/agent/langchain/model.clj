@@ -34,7 +34,49 @@
    :effort :medium})
 
 (def default-configs
-  {:openai/o4-mini
+  {;; OpenAI Models
+   :openai/gpt-4o
+   (merge model-base
+          {:model-name "gpt-4o"})
+
+   :openai/gpt-4-1
+   (merge model-base
+          {:model-name "gpt-4.1"})
+
+   :openai/gpt-4-1-mini
+   (merge model-base
+          {:model-name "gpt-4.1-mini"})
+
+   :openai/gpt-4-1-nano
+   (merge model-base
+          {:model-name "gpt-4.1-nano"})
+
+   :openai/o1
+   (merge reasoning-model-base
+          {:model-name "o1"
+           :thinking {:effort :medium}})
+
+   :openai/o1-mini
+   (merge reasoning-model-base
+          {:model-name "o1-mini"
+           :thinking {:effort :medium}})
+
+   :openai/o3
+   (merge reasoning-model-base
+          {:model-name "o3"
+           :thinking {:effort :medium}})
+
+   :openai/o3-mini
+   (merge reasoning-model-base
+          {:model-name "o3-mini"
+           :thinking {:effort :medium}})
+
+   :openai/o3-pro
+   (merge reasoning-model-base
+          {:model-name "o3-pro-2025-06-10"
+           :thinking {:effort :medium}})
+
+   :openai/o4-mini
    (merge model-base
           {:model-name "o4-mini"})
 
@@ -42,6 +84,15 @@
    (merge reasoning-model-base
           {:model-name "o4-mini"
            :thinking {:effort :medium}})
+
+   ;; Google Models
+   :google/gemini-2-5-flash-lite
+   (merge model-base
+          {:model-name "gemini-2.5-flash-lite"})
+
+   :google/gemini-2-5-pro
+   (merge model-base
+          {:model-name "gemini-2.5-pro"})
 
    :google/gemini-2-5-flash
    (merge model-base
@@ -51,6 +102,27 @@
    (merge reasoning-model-base
           {:model-name "gemini-2.5-flash"
            :thinking thinking-base})
+
+   :google/gemini-2-5-pro-reasoning
+   (merge reasoning-model-base
+          {:model-name "gemini-2.5-pro"
+           :thinking thinking-base})
+
+   ;; Anthropic Models
+   :anthropic/claude-opus-4
+   (merge model-base
+          {:model-name AnthropicChatModelName/CLAUDE_OPUS_4_20250514})
+
+   :anthropic/claude-opus-4-reasoning
+   (merge reasoning-model-base
+          {:model-name AnthropicChatModelName/CLAUDE_OPUS_4_20250514
+           :thinking (merge thinking-base
+                            {:budget-tokens 8192})})
+
+   :anthropic/claude-3-5-haiku
+   (merge model-base
+          {:model-name AnthropicChatModelName/CLAUDE_3_5_HAIKU_20241022
+           :max-tokens 2048}) ; Haiku has lower default max tokens
 
    :anthropic/claude-sonnet-4
    (merge model-base

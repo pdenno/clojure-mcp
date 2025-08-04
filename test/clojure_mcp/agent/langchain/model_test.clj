@@ -14,13 +14,26 @@
 (deftest test-available-models
   (testing "Available models should include all defaults"
     (let [models (model/available-models)]
+      ;; OpenAI models
+      (is (contains? (set models) :openai/gpt-4o))
+      (is (contains? (set models) :openai/gpt-4-1))
+      (is (contains? (set models) :openai/o3))
+      (is (contains? (set models) :openai/o3-pro))
       (is (contains? (set models) :openai/o4-mini))
       (is (contains? (set models) :openai/o4-mini-reasoning))
+      ;; Google models
+      (is (contains? (set models) :google/gemini-2-5-flash-lite))
+      (is (contains? (set models) :google/gemini-2-5-pro))
       (is (contains? (set models) :google/gemini-2-5-flash))
       (is (contains? (set models) :google/gemini-2-5-flash-reasoning))
+      (is (contains? (set models) :google/gemini-2-5-pro-reasoning))
+      ;; Anthropic models
+      (is (contains? (set models) :anthropic/claude-opus-4))
+      (is (contains? (set models) :anthropic/claude-opus-4-reasoning))
+      (is (contains? (set models) :anthropic/claude-3-5-haiku))
       (is (contains? (set models) :anthropic/claude-sonnet-4))
       (is (contains? (set models) :anthropic/claude-sonnet-4-reasoning))
-      (is (= 6 (count models))))))
+      (is (= 16 (count models))))))
 
 (deftest test-get-provider
   (testing "Provider extraction from model keys"
@@ -61,6 +74,39 @@
     (testing "Anthropic builder"
       (let [builder (model/create-model-builder :anthropic/claude-sonnet-4 {})]
         (is (instance? AnthropicChatModel$AnthropicChatModelBuilder builder))))))
+
+(deftest test-new-model-configurations
+  (testing "New OpenAI models"
+    (let [gpt4o (model/create-model-builder :openai/gpt-4o {})
+          o3 (model/create-model-builder :openai/o3 {})]
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder gpt4o))
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder o3))))
+
+  (testing "New Google models"
+    (let [lite (model/create-model-builder :google/gemini-2-5-flash-lite {})
+          pro (model/create-model-builder :google/gemini-2-5-pro {})]
+      (is (instance? GoogleAiGeminiChatModel$GoogleAiGeminiChatModelBuilder lite))
+      (is (instance? GoogleAiGeminiChatModel$GoogleAiGeminiChatModelBuilder pro))))
+
+  (testing "New Anthropic models"
+    (let [opus (model/create-model-builder :anthropic/claude-opus-4 {})
+          haiku (model/create-model-builder :anthropic/claude-3-5-haiku {})]
+      (is (instance? AnthropicChatModel$AnthropicChatModelBuilder opus))
+      (is (instance? AnthropicChatModel$AnthropicChatModelBuilder haiku))))
+
+  (testing "O3 models have high reasoning effort"
+    (let [o3-config (model/merge-with-defaults :openai/o3 {})
+          o3-pro-config (model/merge-with-defaults :openai/o3-pro {})]
+      (is (= :high (get-in o3-config [:thinking :effort])))
+      (is (= :high (get-in o3-pro-config [:thinking :effort])))))
+
+  (testing "Haiku has lower max tokens"
+    (let [haiku-config (model/merge-with-defaults :anthropic/claude-3-5-haiku {})]
+      (is (= 2048 (:max-tokens haiku-config)))))
+
+  (testing "Opus reasoning has higher budget tokens"
+    (let [opus-reasoning (model/merge-with-defaults :anthropic/claude-opus-4-reasoning {})]
+      (is (= 8192 (get-in opus-reasoning [:thinking :budget-tokens]))))))
 
 (deftest test-builder-modifications
   (testing "Builders can be modified before building"
