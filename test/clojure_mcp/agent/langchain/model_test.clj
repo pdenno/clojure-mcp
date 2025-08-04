@@ -1,7 +1,8 @@
 (ns clojure-mcp.agent.langchain.model-test
   (:require
    [clojure.test :refer [deftest testing is]]
-   [clojure-mcp.agent.langchain.model :as model])
+   [clojure-mcp.agent.langchain.model :as model]
+   [clojure-mcp.config :as config])
   (:import
    [dev.langchain4j.model.anthropic
     AnthropicChatModel$AnthropicChatModelBuilder
@@ -293,3 +294,118 @@
     (is (thrown-with-msg? Exception #"Invalid configuration"
                           (model/create-model-builder :openai/o3
                                                       {:thinking {:effort :extreme}})))))
+
+(deftest test-create-model-builder-from-config
+  (testing "User config takes precedence over defaults"
+    (let [user-models {:openai/my-custom {:model-name "gpt-4-turbo"
+                                          :temperature 0.5
+                                          :max-tokens 8192}}
+          nrepl-client-map {::config/config {:models user-models}}
+          builder (model/create-model-builder-from-config
+                   nrepl-client-map
+                   :openai/my-custom
+                   {})]
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+  (testing "Falls back to defaults when not in user config"
+    (let [nrepl-client-map {::config/config {:models {}}}
+          builder (model/create-model-builder-from-config
+                   nrepl-client-map
+                   :openai/gpt-4o
+                   {})]
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+  (testing "Config overrides work with user models"
+    (let [user-models {:anthropic/my-claude {:model-name "claude-3-opus"
+                                             :temperature 0.7}}
+          nrepl-client-map {::config/config {:models user-models}}
+          builder (model/create-model-builder-from-config
+                   nrepl-client-map
+                   :anthropic/my-claude
+                   {:temperature 0.3})] ; Override temperature
+      (is (instance? AnthropicChatModel$AnthropicChatModelBuilder builder))))
+
+  (testing "Unknown model key throws exception"
+    (let [nrepl-client-map {::config/config {:models {}}}]
+      (is (thrown-with-msg? Exception #"Unknown model key"
+                            (model/create-model-builder-from-config
+                             nrepl-client-map
+                             :unknown/model
+                             {})))))
+
+  (testing "Validation works with user models"
+    (let [user-models {:openai/bad-model {:temperature 3.0}} ; Invalid temp
+          nrepl-client-map {::config/config {:models user-models}}]
+      (is (thrown-with-msg? Exception #"Invalid configuration"
+                            (model/create-model-builder-from-config
+                             nrepl-client-map
+                             :openai/bad-model
+                             {}
+                             {:validate? true})))))
+
+  (testing "Can disable validation"
+    (let [user-models {:openai/bad-model {:temperature 3.0}}
+          nrepl-client-map {::config/config {:models user-models}}
+          builder (model/create-model-builder-from-config
+                   nrepl-client-map
+                   :openai/bad-model
+                   {}
+                   {:validate? false})]
+      (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+  (testing "Complex user model with thinking config"
+    (let [user-models {:google/my-gemini {:model-name "gemini-2.5-pro"
+                                          :max-tokens 4096
+                                          :thinking {:enabled true
+                                                     :effort :high
+                                                     :budget-tokens 8192}}}
+          nrepl-client-map {::config/config {:models user-models}}
+          builder (model/create-model-builder-from-config
+                   nrepl-client-map
+                   :google/my-gemini
+                   {})]
+      (is (instance? GoogleAiGeminiChatModel$GoogleAiGeminiChatModelBuilder builder)))))
+
+(deftest test-create-model-from-config
+  (testing "Convenience function builds model directly"
+    (let [user-models {:openai/my-custom {:model-name "gpt-4-turbo"
+                                          :temperature 0.5}}
+          nrepl-client-map {::config/config {:models user-models}}
+          model (model/create-model-from-config
+                 nrepl-client-map
+                 :openai/my-custom)]
+      (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
+             (.getName (.getClass model))))
+      (is (instance? dev.langchain4j.model.openai.OpenAiChatModel model))))
+
+  (testing "Works with default models"
+    (let [nrepl-client-map {::config/config {:models {}}}
+          model (model/create-model-from-config
+                 nrepl-client-map
+                 :google/gemini-2-5-flash)]
+      (is (= "dev.langchain4j.model.googleai.GoogleAiGeminiChatModel"
+             (.getName (.getClass model))))
+      (is (instance? dev.langchain4j.model.googleai.GoogleAiGeminiChatModel model))))
+
+  (testing "Accepts config overrides"
+    (let [user-models {:anthropic/my-claude {:model-name "claude-3-opus"
+                                             :temperature 0.7}}
+          nrepl-client-map {::config/config {:models user-models}}
+          model (model/create-model-from-config
+                 nrepl-client-map
+                 :anthropic/my-claude
+                 {:max-tokens 2048})]
+      (is (= "dev.langchain4j.model.anthropic.AnthropicChatModel"
+             (.getName (.getClass model))))
+      (is (instance? dev.langchain4j.model.anthropic.AnthropicChatModel model))))
+
+  (testing "Validation can be disabled"
+    (let [user-models {:openai/bad-model {:temperature 3.0}}
+          nrepl-client-map {::config/config {:models user-models}}
+          model (model/create-model-from-config
+                 nrepl-client-map
+                 :openai/bad-model
+                 {}
+                 {:validate? false})]
+      (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
+             (.getName (.getClass model)))))))

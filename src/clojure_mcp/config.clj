@@ -144,8 +144,17 @@
       "scratch_pad.edn" ; Default filename
       value)))
 
+(defn get-models
+  "Returns the models configuration map.
+   Defaults to empty map when not specified."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :models)]
+    (if (nil? value)
+      {} ; Default to empty map
+      value)))
+
 (defn get-mcp-client-hint [nrepl-client-map]
-  (get-config nrepl-client-map :mcp-client-hint))
+  (get-config nrepl-client-map :mcp-client))
 
 (defn get-dispatch-agent-context
   "Returns dispatch agent context configuration.

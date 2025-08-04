@@ -147,6 +147,11 @@ your-project/
 - `scratch-pad-file`: Filename for scratch pad persistence (default: `"scratch_pad.edn"`)
   - Specifies the filename within `.clojure-mcp/` directory
   - Only used when `scratch-pad-load` is `true`
+- `models`: Map of custom model configurations (default: `{}`)
+  - Define named model configurations for LangChain4j integration
+  - Keys are namespaced keywords like `:openai/my-gpt4` or `:anthropic/my-claude`
+  - Values are configuration maps with model parameters
+  - Falls back to built-in defaults if custom model not found
 
 ### Example Configuration
 ```edn
@@ -156,7 +161,13 @@ your-project/
  :cljfmt true
  :bash-over-nrepl true
  :scratch-pad-load false
- :scratch-pad-file "scratch_pad.edn"}
+ :scratch-pad-file "scratch_pad.edn"
+ :models {:openai/my-fast {:model-name "gpt-4o"
+                           :temperature 0.3
+                           :max-tokens 2048}
+          :anthropic/my-reasoning {:model-name "claude-3-5-sonnet-20241022"
+                                   :thinking {:enabled true
+                                             :budget-tokens 4096}}}}
 ```
 
 ### Path Resolution and Security
@@ -456,6 +467,13 @@ See `/doc/custom-mcp-server.md` for comprehensive documentation on creating cust
    - See `sse-main.clj` for an example implementation
 
 ## Recent Organizational Changes
+
+**Model Configuration Support**: Added support for user-defined model configurations via `.clojure-mcp/config.edn`:
+- Users can define custom named model configurations under the `:models` key
+- New `create-model-builder-from-config` function in `model.clj` uses nrepl-client-map to access user configs
+- Falls back to built-in defaults when custom models aren't found
+- Supports all existing validation and model parameters
+- Example: `:models {:openai/my-fast {:model-name "gpt-4o" :temperature 0.3}}`
 
 **New Factory Function Pattern**: The project has been refactored to use a cleaner pattern for creating custom MCP servers:
 - Factory functions (`make-tools`, `make-prompts`, `make-resources`) with consistent signatures

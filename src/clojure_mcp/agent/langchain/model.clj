@@ -1,7 +1,8 @@
 (ns clojure-mcp.agent.langchain.model
   (:require
    [clojure.string :as string]
-   [clojure-mcp.agent.langchain.model-spec :as spec])
+   [clojure-mcp.agent.langchain.model-spec :as spec]
+   [clojure-mcp.config :as config])
   (:import
    [dev.langchain4j.model.anthropic
     AnthropicChatModel
@@ -379,3 +380,62 @@
   (defmethod create-builder provider
     [p c]
     (builder-fn p c)))
+
+(defn create-model-builder-from-config
+  "Creates a model builder using configuration from nrepl-client-map.
+   Checks user-configured models first, then falls back to defaults.
+   
+   Usage:
+   (create-model-builder-from-config nrepl-client-map :openai/my-custom-gpt4)
+   (create-model-builder-from-config nrepl-client-map :openai/gpt-4o {:temperature 0.5})
+   
+   Options:
+   - :validate? - When true, validates config against specs (default: true)
+   
+   Returns a builder object. Call .build() on it to get the final model."
+  ([nrepl-client-map model-key]
+   (create-model-builder-from-config nrepl-client-map model-key {} {}))
+  ([nrepl-client-map model-key config-overrides]
+   (create-model-builder-from-config nrepl-client-map model-key config-overrides {:validate? true}))
+  ([nrepl-client-map model-key config-overrides {:keys [validate?] :or {validate? true} :as options}]
+   (let [user-models (config/get-models nrepl-client-map)
+         ;; Look in user config first, then defaults
+         base-config (or (get user-models model-key)
+                         (get default-configs model-key))
+         _ (when (nil? base-config)
+             (throw (ex-info (str "Unknown model key: " model-key
+                                  ". Not found in user config or defaults.")
+                             {:model-key model-key
+                              :available-user-models (keys user-models)
+                              :available-default-models (keys default-configs)})))
+         ;; Merge base config with overrides
+         config (merge base-config config-overrides)
+         ;; Extract provider from model key
+         provider (get-provider model-key)
+         ;; Ensure API key
+         final-config (ensure-api-key config provider)]
+     ;; Validate if requested
+     (when validate?
+       (spec/validate-model-key model-key)
+       (spec/validate-config-for-provider provider final-config))
+     ;; Create builder
+     (create-builder provider final-config))))
+
+(defn create-model-from-config
+  "Convenience function that creates and builds a model using configuration from nrepl-client-map.
+   This is equivalent to calling (.build (create-model-builder-from-config ...))
+   
+   Usage:
+   (create-model-from-config nrepl-client-map :openai/my-custom-gpt4)
+   (create-model-from-config nrepl-client-map :openai/gpt-4o {:temperature 0.5})
+   
+   Options:
+   - :validate? - When true, validates config against specs (default: true)
+   
+   Returns a fully built model ready for use."
+  ([nrepl-client-map model-key]
+   (create-model-from-config nrepl-client-map model-key {} {}))
+  ([nrepl-client-map model-key config-overrides]
+   (create-model-from-config nrepl-client-map model-key config-overrides {:validate? true}))
+  ([nrepl-client-map model-key config-overrides options]
+   (.build (create-model-builder-from-config nrepl-client-map model-key config-overrides options))))
