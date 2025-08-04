@@ -143,6 +143,52 @@
   (let [defaults (get default-configs model-key {})]
     (merge defaults config-overrides)))
 
+(def ^:dynamic *env-overrides*
+  "Dynamic var for overriding environment variables in tests.
+   When bound to a map, these values take precedence over System/getenv."
+  nil)
+
+(defn- get-env
+  "Gets environment variable, checking *env-overrides* first for testing."
+  [var-name]
+  (or (when *env-overrides*
+        (get *env-overrides* var-name))
+      (System/getenv var-name)))
+
+(defn- resolve-env-refs
+  "Resolves [:env \"VAR_NAME\"] references to environment variable values.
+   Recursively processes nested maps and collections.
+   
+   Note: Environment variables are always returned as strings. Use this
+   pattern primarily for string values like :api-key and :base-url.
+   For numeric values, consider using direct values in config.
+   
+   Examples:
+   {:api-key [:env \"OPENAI_API_KEY\"]} => {:api-key \"actual-key-value\"}
+   {:api-key \"direct-value\"} => {:api-key \"direct-value\"}"
+  [config]
+  (cond
+    ;; Handle [:env "VAR_NAME"] pattern
+    (and (vector? config)
+         (= 2 (count config))
+         (= :env (first config))
+         (string? (second config)))
+    (get-env (second config))
+
+    ;; Recursively process maps
+    (map? config)
+    (reduce-kv (fn [m k v]
+                 (assoc m k (resolve-env-refs v)))
+               {}
+               config)
+
+    ;; Recursively process sequential collections
+    (sequential? config)
+    (mapv resolve-env-refs config)
+
+    ;; Return other values as-is
+    :else config))
+
 (defn- ensure-api-key
   "Ensures API key is present, getting from environment if needed"
   [config provider]
@@ -152,7 +198,7 @@
                            :google "GEMINI_API_KEY"
                            :anthropic "ANTHROPIC_API_KEY"}
           env-key (get env-key-mapping provider)]
-      (if-let [api-key (and env-key (System/getenv env-key))]
+      (if-let [api-key (and env-key (get-env env-key))]
         (assoc config :api-key api-key)
         config))))
 
@@ -315,7 +361,10 @@
    (create-model-builder model-key config-overrides {:validate? true}))
   ([model-key config-overrides {:keys [validate?] :or {validate? true}}]
    (let [provider (get-provider model-key)
-         config (-> (merge-with-defaults model-key config-overrides)
+         ;; Resolve env refs in config overrides
+         resolved-overrides (resolve-env-refs config-overrides)
+         config (-> (merge-with-defaults model-key resolved-overrides)
+                    (resolve-env-refs) ; Also resolve any env refs from defaults
                     (ensure-api-key provider))]
      ;; Validate if requested
      (when validate?
@@ -334,11 +383,13 @@
   ([provider config]
    (create-builder-from-config provider config {:validate? true}))
   ([provider config {:keys [validate?] :or {validate? true}}]
-   (let [config (ensure-api-key config provider)]
+   (let [;; Resolve env refs in config
+         resolved-config (resolve-env-refs config)
+         final-config (ensure-api-key resolved-config provider)]
      ;; Validate if requested
      (when validate?
-       (spec/validate-config-for-provider provider config))
-     (create-builder provider config))))
+       (spec/validate-config-for-provider provider final-config))
+     (create-builder provider final-config))))
 
 (defn build-model
   "Convenience function that creates a model builder and builds it immediately.
@@ -408,8 +459,11 @@
                              {:model-key model-key
                               :available-user-models (keys user-models)
                               :available-default-models (keys default-configs)})))
-         ;; Merge base config with overrides
-         config (merge base-config config-overrides)
+         ;; Resolve env refs in base config and overrides
+         resolved-base (resolve-env-refs base-config)
+         resolved-overrides (resolve-env-refs config-overrides)
+         ;; Merge resolved configs
+         config (merge resolved-base resolved-overrides)
          ;; Extract provider from model key
          provider (get-provider model-key)
          ;; Ensure API key

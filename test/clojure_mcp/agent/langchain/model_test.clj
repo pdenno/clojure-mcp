@@ -409,3 +409,133 @@
                  {:validate? false})]
       (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
              (.getName (.getClass model)))))))
+
+(deftest test-env-ref-resolution
+  (testing "Direct values are preserved"
+    (let [config {:api-key "direct-key"
+                  :base-url "https://api.example.com"
+                  :temperature 0.7}
+          resolved (#'model/resolve-env-refs config)]
+      (is (= config resolved))))
+
+  (testing "Environment variable references are resolved with test overrides"
+    (binding [model/*env-overrides* {"TEST_API_KEY" "test-key-value"
+                                     "TEST_BASE_URL" "https://test.example.com"}]
+      (let [config {:api-key [:env "TEST_API_KEY"]
+                    :base-url [:env "TEST_BASE_URL"]
+                    :temperature 0.7}
+            resolved (#'model/resolve-env-refs config)]
+        (is (= "test-key-value" (:api-key resolved)))
+        (is (= "https://test.example.com" (:base-url resolved)))
+        (is (= 0.7 (:temperature resolved))))))
+
+  (testing "Environment variable references return nil when not set"
+    (binding [model/*env-overrides* {}] ; Empty overrides
+      (let [config {:api-key [:env "DEFINITELY_NOT_SET_VAR"]
+                    :temperature 0.7}
+            resolved (#'model/resolve-env-refs config)]
+        (is (nil? (:api-key resolved)))
+        (is (= 0.7 (:temperature resolved))))))
+
+  (testing "Nested env refs are resolved"
+    (binding [model/*env-overrides* {"TEST_BUDGET" "4096"}]
+      (let [config {:thinking {:enabled true
+                               :budget-tokens [:env "TEST_BUDGET"]}
+                    :temperature 0.7}
+            resolved (#'model/resolve-env-refs config)]
+        (is (= "4096" (get-in resolved [:thinking :budget-tokens])))
+        (is (= true (get-in resolved [:thinking :enabled]))))))
+
+  (testing "Mixed configs work correctly"
+    (binding [model/*env-overrides* {"TEST_MODEL_NAME" "gpt-4-turbo"
+                                     "TEST_ORG_ID" "org-123"}]
+      (let [config {:model-name [:env "TEST_MODEL_NAME"]
+                    :api-key "direct-api-key"
+                    :openai {:organization-id [:env "TEST_ORG_ID"]
+                             :project-id "direct-project"}}
+            resolved (#'model/resolve-env-refs config)]
+        (is (= "gpt-4-turbo" (:model-name resolved)))
+        (is (= "direct-api-key" (:api-key resolved)))
+        (is (= "org-123" (get-in resolved [:openai :organization-id])))
+        (is (= "direct-project" (get-in resolved [:openai :project-id]))))))
+
+  (testing "Actual env var resolution (if OPENAI_API_KEY is set)"
+    ;; This test uses real env vars without overrides
+    (when (System/getenv "OPENAI_API_KEY")
+      (let [config {:api-key [:env "OPENAI_API_KEY"]}
+            resolved (#'model/resolve-env-refs config)]
+        (is (string? (:api-key resolved)))
+        (is (not (nil? (:api-key resolved))))))))
+
+(deftest test-env-refs-with-model-creation
+  (testing "Env refs in user config are resolved"
+    (binding [model/*env-overrides* {"TEST_OPENAI_KEY" "test-api-key"
+                                     "TEST_OPENAI_URL" "https://test.openai.com"}]
+      (let [user-models {:openai/env-based {:model-name "gpt-4o"
+                                            :api-key [:env "TEST_OPENAI_KEY"]
+                                            :base-url [:env "TEST_OPENAI_URL"]
+                                            :temperature 0.5}}
+            nrepl-client-map {::config/config {:models user-models}}]
+
+        (testing "Builder creation works with env refs"
+          (let [builder (model/create-model-builder-from-config
+                         nrepl-client-map
+                         :openai/env-based
+                         {})]
+            (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+        (testing "Config overrides work with builder"
+          (let [builder (model/create-model-builder-from-config
+                         nrepl-client-map
+                         :openai/env-based
+                         {:max-tokens 2048})] ; Use direct value instead of env ref
+            (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder)))))))
+
+  (testing "Env refs in default models work with test env vars"
+    (binding [model/*env-overrides* {"CUSTOM_API_KEY" "custom-key"
+                                     "CUSTOM_BASE_URL" "https://custom.api.com"}]
+      (let [builder (model/create-model-builder
+                     :openai/gpt-4o
+                     {:api-key [:env "CUSTOM_API_KEY"]
+                      :base-url [:env "CUSTOM_BASE_URL"]})]
+        (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder)))))
+
+  (testing "Falls back to real env vars when not in overrides"
+    ;; This test checks actual environment
+    (if (System/getenv "OPENAI_API_KEY")
+      (let [builder (model/create-model-builder
+                     :openai/gpt-4o
+                     {:api-key [:env "OPENAI_API_KEY"]})]
+        (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder)))
+      (is true "Skipping - OPENAI_API_KEY not set"))))
+
+(deftest test-api-key-fallback-with-env-overrides
+  (testing "API key auto-fallback works with env overrides"
+    (binding [model/*env-overrides* {"OPENAI_API_KEY" "test-openai-key"
+                                     "GEMINI_API_KEY" "test-gemini-key"
+                                     "ANTHROPIC_API_KEY" "test-anthropic-key"}]
+      (testing "OpenAI uses OPENAI_API_KEY when no api-key in config"
+        (let [builder (model/create-model-builder
+                       :openai/gpt-4o
+                       {:temperature 0.5})] ; No api-key provided
+          (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))))
+
+      (testing "Google uses GEMINI_API_KEY when no api-key in config"
+        (let [builder (model/create-model-builder
+                       :google/gemini-2-5-flash
+                       {:temperature 0.5})]
+          (is (instance? GoogleAiGeminiChatModel$GoogleAiGeminiChatModelBuilder builder))))
+
+      (testing "Anthropic uses ANTHROPIC_API_KEY when no api-key in config"
+        (let [builder (model/create-model-builder
+                       :anthropic/claude-sonnet-4
+                       {:temperature 0.5})]
+          (is (instance? AnthropicChatModel$AnthropicChatModelBuilder builder))))
+
+      (testing "Explicit api-key in config takes precedence"
+        (let [builder (model/create-model-builder
+                       :openai/gpt-4o
+                       {:api-key "explicit-key"})]
+          (is (instance? OpenAiChatModel$OpenAiChatModelBuilder builder))
+          ;; We can't easily verify the actual key used, but the builder is created
+          )))))

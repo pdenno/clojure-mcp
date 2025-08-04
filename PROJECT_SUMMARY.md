@@ -161,6 +161,7 @@ your-project/
   - Define named model configurations for LangChain4j integration
   - Keys are namespaced keywords like `:openai/my-gpt4` or `:anthropic/my-claude`
   - Values are configuration maps with model parameters
+  - Supports environment variable references: `{:api-key [:env "OPENAI_API_KEY"]}`
   - Falls back to built-in defaults if custom model not found
 
 ### Example Configuration
@@ -174,10 +175,14 @@ your-project/
  :scratch-pad-file "scratch_pad.edn"
  :models {:openai/my-fast {:model-name "gpt-4o"
                            :temperature 0.3
-                           :max-tokens 2048}
+                           :max-tokens 2048
+                           ;; Reference environment variable
+                           :api-key [:env "OPENAI_API_KEY"]}
           :anthropic/my-reasoning {:model-name "claude-3-5-sonnet-20241022"
                                    :thinking {:enabled true
-                                             :budget-tokens 4096}}}}
+                                             :budget-tokens 4096}
+                                   ;; Direct value (not recommended for production)
+                                   :api-key "sk-ant-..."}}}
 ```
 
 ### Path Resolution and Security
@@ -480,10 +485,11 @@ See `/doc/custom-mcp-server.md` for comprehensive documentation on creating cust
 
 **Model Configuration Support**: Added support for user-defined model configurations via `.clojure-mcp/config.edn`:
 - Users can define custom named model configurations under the `:models` key
-- New `create-model-builder-from-config` function in `model.clj` uses nrepl-client-map to access user configs
+- New `create-model-builder-from-config` and `create-model-from-config` functions use nrepl-client-map to access user configs
 - Falls back to built-in defaults when custom models aren't found
+- Supports environment variable references with `[:env "VAR_NAME"]` syntax for secure API key configuration
 - Supports all existing validation and model parameters
-- Example: `:models {:openai/my-fast {:model-name "gpt-4o" :temperature 0.3}}`
+- Example: `:models {:openai/my-fast {:model-name "gpt-4o" :temperature 0.3 :api-key [:env "OPENAI_API_KEY"]}}`
 
 **New Factory Function Pattern**: The project has been refactored to use a cleaner pattern for creating custom MCP servers:
 - Factory functions (`make-tools`, `make-prompts`, `make-resources`) with consistent signatures
