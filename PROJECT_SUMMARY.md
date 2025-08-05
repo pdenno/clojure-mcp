@@ -168,19 +168,19 @@ your-project/
 - `enable-prompts`: List of prompt names to enable (default: `nil` - all prompts enabled)
   - When provided, only prompts in this list are enabled
   - Empty list `[]` disables all prompts
-  - Prompt names can be keywords or strings (e.g., `:chat-session-summarize` or `"chat-session-summarize"`)
+  - Prompt names must be strings (e.g., `"chat-session-summarize"` or `"clojure_repl_system_prompt"`)
 - `disable-prompts`: List of prompt names to disable (default: `nil` - no prompts disabled)
   - Applied after `enable-prompts` filtering
   - Useful for excluding specific prompts while keeping most enabled
-  - Prompt names can be keywords or strings
+  - Prompt names must be strings
 - `enable-resources`: List of resource names to enable (default: `nil` - all resources enabled)
   - When provided, only resources in this list are enabled
   - Empty list `[]` disables all resources
-  - Resource names can be keywords or strings (e.g., `"PROJECT_SUMMARY.md"` or `:README.md`)
+  - Resource names must be strings (e.g., `"PROJECT_SUMMARY.md"` or `"README.md"`)
 - `disable-resources`: List of resource names to disable (default: `nil` - no resources disabled)
   - Applied after `enable-resources` filtering
   - Useful for excluding specific resources while keeping most enabled
-  - Resource names can be keywords or strings
+  - Resource names must be strings
 - `models`: Map of custom model configurations (default: `{}`)
   - Define named model configurations for LangChain4j integration
   - Keys are namespaced keywords like `:openai/my-gpt4` or `:anthropic/my-claude`
@@ -199,10 +199,10 @@ your-project/
  :scratch-pad-file "scratch_pad.edn"
  :enable-tools [:clojure-eval :read-file :file-write :grep :glob-files]
  :disable-tools [:dispatch-agent :architect]
- :enable-prompts [:clojure_repl_system_prompt :chat-session-summarize]
- :disable-prompts [:scratch-pad-save-as]
- :enable-resources [:PROJECT_SUMMARY.md :README.md]
- :disable-resources [:CLAUDE.md :LLM_CODE_STYLE.md]
+ :enable-prompts ["clojure_repl_system_prompt" "chat-session-summarize"]
+ :disable-prompts ["scratch-pad-save-as"]
+ :enable-resources ["PROJECT_SUMMARY.md" "README.md"]
+ :disable-resources ["CLAUDE.md" "LLM_CODE_STYLE.md"]
  :models {:openai/my-fast {:model-name "gpt-4o"
                            :temperature 0.3
                            :max-tokens 2048

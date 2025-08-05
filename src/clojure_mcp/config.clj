@@ -243,21 +243,18 @@
   [nrepl-client-map prompt-name]
   (let [enable-prompts (get-enable-prompts nrepl-client-map)
         disable-prompts (get-disable-prompts nrepl-client-map)
-        ;; Convert prompt name to keyword (idempotent)
-        prompt-keyword (keyword prompt-name)
-        ;; Convert all config entries to keywords
-        enable-set (when enable-prompts (set (map keyword enable-prompts)))
-        disable-set (when disable-prompts (set (map keyword disable-prompts)))]
+        enable-set (when enable-prompts (set enable-prompts))
+        disable-set (when disable-prompts (set disable-prompts))]
     (cond
       ;; If enable is empty list [], nothing is enabled
       (and (some? enable-prompts) (empty? enable-prompts)) false
 
       ;; If enable is nil, all are enabled (unless in disable list)
-      (nil? enable-prompts) (not (contains? disable-set prompt-keyword))
+      (nil? enable-prompts) (not (contains? disable-set prompt-name))
 
       ;; If enable is provided, check if prompt is in enable list AND not in disable list
-      :else (and (contains? enable-set prompt-keyword)
-                 (not (contains? disable-set prompt-keyword))))))
+      :else (and (contains? enable-set prompt-name)
+                 (not (contains? disable-set prompt-name))))))
 
 (defn get-enable-resources [nrepl-client-map]
   (get-config nrepl-client-map :enable-resources))
@@ -274,26 +271,23 @@
    - If :enable-resources is provided, only those resources are enabled
    - :disable-resources is then applied to remove resources from the enabled set
    
-   Resource names are converted to keywords for comparison.
-   Both config lists can contain strings or keywords."
+   Resource names are used as strings for comparison.
+   Both config lists should contain strings."
   [nrepl-client-map resource-name]
   (let [enable-resources (get-enable-resources nrepl-client-map)
         disable-resources (get-disable-resources nrepl-client-map)
-        ;; Convert resource name to keyword (idempotent)
-        resource-keyword (keyword resource-name)
-        ;; Convert all config entries to keywords
-        enable-set (when enable-resources (set (map keyword enable-resources)))
-        disable-set (when disable-resources (set (map keyword disable-resources)))]
+        enable-set (when enable-resources (set enable-resources))
+        disable-set (when disable-resources (set disable-resources))]
     (cond
       ;; If enable is empty list [], nothing is enabled
       (and (some? enable-resources) (empty? enable-resources)) false
 
       ;; If enable is nil, all are enabled (unless in disable list)
-      (nil? enable-resources) (not (contains? disable-set resource-keyword))
+      (nil? enable-resources) (not (contains? disable-set resource-name))
 
       ;; If enable is provided, check if resource is in enable list AND not in disable list
-      :else (and (contains? enable-set resource-keyword)
-                 (not (contains? disable-set resource-keyword))))))
+      :else (and (contains? enable-set resource-name)
+                 (not (contains? disable-set resource-name))))))
 
 (defn set-config*
   "Sets a config value in a map. Returns the updated map.
