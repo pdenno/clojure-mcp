@@ -172,13 +172,17 @@
 
 (deftest test-build-model-convenience
   (testing "Convenience build functions"
-    (let [model (model/build-model :openai/o4-mini {})]
-      (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
-             (.getName (.getClass model)))))
+    (binding [model/*env-overrides* {"OPENAI_API_KEY" "test-key-value"
+                                     "ANTHROPIC_API_KEY" "test-key-value"
+                                     "GEMINI_API_KEY" "test-key-value"}]
 
-    (let [model (model/build-model-from-config :google {:model-name "gemini-2.5-flash"})]
-      (is (= "dev.langchain4j.model.googleai.GoogleAiGeminiChatModel"
-             (.getName (.getClass model)))))))
+      (let [model (model/build-model :openai/o4-mini {})]
+        (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
+               (.getName (.getClass model)))))
+
+      (let [model (model/build-model-from-config :google {:model-name "gemini-2.5-flash"})]
+        (is (= "dev.langchain4j.model.googleai.GoogleAiGeminiChatModel"
+               (.getName (.getClass model))))))))
 
 (deftest test-multimethod-dispatch
   (testing "Multimethod dispatches correctly based on config :provider"
@@ -414,47 +418,59 @@
 
 (deftest test-create-model-from-config
   (testing "Convenience function builds model directly"
-    (let [user-models {:openai/my-custom {:model-name "gpt-4-turbo"
-                                          :temperature 0.5}}
-          nrepl-client-map {::config/config {:models user-models}}
-          model (model/create-model-from-config
-                 nrepl-client-map
-                 :openai/my-custom)]
-      (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
-             (.getName (.getClass model))))
-      (is (instance? dev.langchain4j.model.openai.OpenAiChatModel model))))
+    (binding [model/*env-overrides* {"OPENAI_API_KEY" "test-key-value"
+                                     "ANTHROPIC_API_KEY" "test-key-value"
+                                     "GEMINI_API_KEY" "test-key-value"}]
+      (let [user-models {:openai/my-custom {:model-name "gpt-4-turbo"
+                                            :temperature 0.5}}
+            nrepl-client-map {::config/config {:models user-models}}
+            model (model/create-model-from-config
+                   nrepl-client-map
+                   :openai/my-custom)]
+        (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
+               (.getName (.getClass model))))
+        (is (instance? dev.langchain4j.model.openai.OpenAiChatModel model)))))
 
   (testing "Works with default models"
-    (let [nrepl-client-map {::config/config {:models {}}}
-          model (model/create-model-from-config
-                 nrepl-client-map
-                 :google/gemini-2-5-flash)]
-      (is (= "dev.langchain4j.model.googleai.GoogleAiGeminiChatModel"
-             (.getName (.getClass model))))
-      (is (instance? dev.langchain4j.model.googleai.GoogleAiGeminiChatModel model))))
+    (binding [model/*env-overrides* {"OPENAI_API_KEY" "test-key-value"
+                                     "ANTHROPIC_API_KEY" "test-key-value"
+                                     "GEMINI_API_KEY" "test-key-value"}]
+      (let [nrepl-client-map {::config/config {:models {}}}
+            model (model/create-model-from-config
+                   nrepl-client-map
+                   :google/gemini-2-5-flash)]
+        (is (= "dev.langchain4j.model.googleai.GoogleAiGeminiChatModel"
+               (.getName (.getClass model))))
+        (is (instance? dev.langchain4j.model.googleai.GoogleAiGeminiChatModel model)))))
 
   (testing "Accepts config overrides"
-    (let [user-models {:anthropic/my-claude {:model-name "claude-3-opus"
-                                             :temperature 0.7}}
-          nrepl-client-map {::config/config {:models user-models}}
-          model (model/create-model-from-config
-                 nrepl-client-map
-                 :anthropic/my-claude
-                 {:max-tokens 2048})]
-      (is (= "dev.langchain4j.model.anthropic.AnthropicChatModel"
-             (.getName (.getClass model))))
-      (is (instance? dev.langchain4j.model.anthropic.AnthropicChatModel model))))
+    (binding [model/*env-overrides* {"OPENAI_API_KEY" "test-key-value"
+                                     "ANTHROPIC_API_KEY" "test-key-value"
+                                     "GEMINI_API_KEY" "test-key-value"}]
+      (let [user-models {:anthropic/my-claude {:model-name "claude-3-opus"
+                                               :temperature 0.7}}
+            nrepl-client-map {::config/config {:models user-models}}
+            model (model/create-model-from-config
+                   nrepl-client-map
+                   :anthropic/my-claude
+                   {:max-tokens 2048})]
+        (is (= "dev.langchain4j.model.anthropic.AnthropicChatModel"
+               (.getName (.getClass model))))
+        (is (instance? dev.langchain4j.model.anthropic.AnthropicChatModel model)))))
 
   (testing "Validation can be disabled"
-    (let [user-models {:openai/bad-model {:temperature 3.0}}
-          nrepl-client-map {::config/config {:models user-models}}
-          model (model/create-model-from-config
-                 nrepl-client-map
-                 :openai/bad-model
-                 {}
-                 {:validate? false})]
-      (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
-             (.getName (.getClass model)))))))
+    (binding [model/*env-overrides* {"OPENAI_API_KEY" "test-key-value"
+                                     "ANTHROPIC_API_KEY" "test-key-value"
+                                     "GEMINI_API_KEY" "test-key-value"}]
+      (let [user-models {:openai/bad-model {:temperature 3.0}}
+            nrepl-client-map {::config/config {:models user-models}}
+            model (model/create-model-from-config
+                   nrepl-client-map
+                   :openai/bad-model
+                   {}
+                   {:validate? false})]
+        (is (= "dev.langchain4j.model.openai.OpenAiChatModel"
+               (.getName (.getClass model))))))))
 
 (deftest test-env-ref-resolution
   (testing "Direct values are preserved"
