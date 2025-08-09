@@ -94,10 +94,10 @@
       (catch Exception e
         {:success false :error (.getMessage e)}))))
 
-;; Tests for :full-read mode (default)
+;; Tests for :full-read mode
 (deftest full-read-mode-test
-  (testing ":full-read mode (default behavior)"
-    ;; Explicitly set to :full-read (though it's the default)
+  (testing ":full-read mode"
+    ;; Explicitly set to :full-read
     (set-write-file-guard! :full-read)
 
     (let [file-path (create-test-file! "full-read-test.clj"
@@ -213,24 +213,27 @@
     (let [file-path (create-test-file! "default-test.clj"
                                        "(ns test)\n(defn hello [] :world)")]
 
-      (testing "should behave as :full-read by default"
+      (testing "should behave as :partial-read by default"
         ;; Perform collapsed read
         (let [read-result (read-file-collapsed! file-path)]
           (is (not (:error read-result))))
 
-        ;; Try to edit - should fail (default is :full-read)
-        (let [edit-result (edit-file! file-path "hello" "goodbye")]
-          (is (false? (:success edit-result)))
-          (is (str/includes? (:error edit-result) "File has been modified since last read")))
-
-        ;; Perform full read
-        (let [read-result (read-file-full! file-path)]
-          (is (not (:error read-result))))
-
-        ;; Try to edit - should succeed
+        ;; Try to edit - should succeed (default is :partial-read)
         (let [edit-result (edit-file! file-path "hello" "goodbye")]
           (is (true? (:success edit-result)))
-          (is (str/includes? (slurp file-path) "goodbye")))))))
+          (is (str/includes? (slurp file-path) "goodbye")))
+
+        ;; Reset file for next test
+        (spit file-path "(ns test)\n(defn hello [] :world)")
+
+        ;; External modification should still require re-reading
+        (Thread/sleep 100)
+        (spit file-path "(ns test)\n(defn external [] :change)")
+
+        ;; Try to edit - should fail
+        (let [edit-result (edit-file! file-path "external" "internal")]
+          (is (false? (:success edit-result)))
+          (is (str/includes? (:error edit-result) "File has been modified since last read")))))))
 
 ;; Test configuration validation
 (deftest config-validation-test
@@ -242,15 +245,15 @@
     (let [file-path (create-test-file! "validation-test.clj"
                                        "(ns test)\n(defn hello [] :world)")]
 
-      (testing "should fall back to default behavior (:full-read)"
+      (testing "should fall back to default behavior (:partial-read)"
         ;; Perform collapsed read
         (let [read-result (read-file-collapsed! file-path)]
           (is (not (:error read-result))))
 
-        ;; Try to edit - should fail (falls back to :full-read)
+        ;; Try to edit - should succeed (falls back to :partial-read)
         (let [edit-result (edit-file! file-path "hello" "goodbye")]
-          (is (false? (:success edit-result)))
-          (is (str/includes? (:error edit-result) "File has been modified since last read")))))))
+          (is (true? (:success edit-result)))
+          (is (str/includes? (slurp file-path) "goodbye")))))))
 
 ;; Test interaction between different tools
 (deftest multi-tool-interaction-test

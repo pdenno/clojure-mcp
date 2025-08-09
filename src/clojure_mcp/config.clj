@@ -22,7 +22,7 @@
     (when (some? write-file-guard)
       (when-not (contains? #{:full-read :partial-read false} write-file-guard)
         (log/warn "Invalid write-file-guard value:" write-file-guard
-                  "- using default :full-read")
+                  "- using default :partial-read")
         (throw (ex-info (str "Invalid Config: write-file-guard value:  " write-file-guard
                              "- must be one of (:full-read, :partial-read, false)")
                         {:write-file-guard write-file-guard}))))
@@ -83,16 +83,16 @@
 
 (defn get-write-file-guard [nrepl-client-map]
   (let [value (get-config nrepl-client-map :write-file-guard)]
-    ;; Validate the value and default to :full-read if invalid
+    ;; Validate the value and default to :partial-read if invalid
     (cond
       ;; nil means not configured, use default
-      (nil? value) :full-read
+      (nil? value) :partial-read
       ;; Valid values (including false)
       (contains? #{:full-read :partial-read false} value) value
       ;; Invalid values
       :else (do
-              (log/warn "Invalid write-file-guard value:" value "- using default :full-read")
-              :full-read))))
+              (log/warn "Invalid write-file-guard value:" value "- using default :partial-read")
+              :partial-read))))
 
 (defn get-nrepl-env-type
   "Returns the nREPL environment type.
