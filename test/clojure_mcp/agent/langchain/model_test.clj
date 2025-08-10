@@ -39,7 +39,7 @@
       (is (contains? (set models) :anthropic/claude-3-5-haiku))
       (is (contains? (set models) :anthropic/claude-sonnet-4))
       (is (contains? (set models) :anthropic/claude-sonnet-4-reasoning))
-      (is (= 21 (count models))))))
+      (is (= 26 (count models))))))
 
 (deftest test-get-provider
   (testing "Provider extraction from model keys"

@@ -54,6 +54,21 @@
    (merge model-base
           {:model-name "gpt-4.1-nano"})
 
+   :openai/gpt-5
+   (merge model-base
+          {:model-name "gpt-5-2025-08-07"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-mini
+   (merge model-base
+          {:model-name "gpt-5-mini-2025-08-07"
+           :thinking {:effort :medium}})
+
+   :openai/gpt-5-nano
+   (merge model-base
+          {:model-name "gpt-5-nano-2025-08-07"
+           :thinking {:effort :medium}})
+
    :openai/o1
    (merge reasoning-model-base
           {:model-name "o1"
@@ -112,6 +127,16 @@
            :thinking thinking-base})
 
    ;; Anthropic Models
+   :anthropic/claude-opus-4-1
+   (merge model-base
+          {:model-name "claude-opus-4-1-20250805"})
+
+   :anthropic/claude-opus-4-1-reasoning
+   (merge reasoning-model-base
+          {:model-name "claude-opus-4-1-20250805"
+           :thinking (merge thinking-base
+                            {:budget-tokens 8192})})
+
    :anthropic/claude-opus-4
    (merge model-base
           {:model-name AnthropicChatModelName/CLAUDE_OPUS_4_20250514})
