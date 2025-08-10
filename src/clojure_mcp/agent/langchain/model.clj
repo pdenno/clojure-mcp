@@ -2,7 +2,8 @@
   (:require
    [clojure.string :as string]
    [clojure-mcp.agent.langchain.model-spec :as spec]
-   [clojure-mcp.config :as config])
+   [clojure-mcp.config :as config]
+   [clojure.tools.logging :as log])
   (:import
    [dev.langchain4j.model.anthropic
     AnthropicChatModel
@@ -508,3 +509,30 @@
    (create-model-from-config nrepl-client-map model-key config-overrides {:validate? true}))
   ([nrepl-client-map model-key config-overrides options]
    (.build (create-model-builder-from-config nrepl-client-map model-key config-overrides options))))
+
+(defn get-tool-model
+  "Gets and creates a model for a specific tool based on its configuration.
+   Looks for the model configuration key within the tool's config and creates the model.
+   
+   Args:
+   - nrepl-client-map: The nREPL client map containing configuration
+   - tool-key: The tool identifier (e.g., :dispatch_agent)
+   - model-config-key: The key within tool config that contains the model reference (default: :model)
+   
+   Returns the created model or nil if not configured or creation fails.
+   
+   Example:
+   (get-tool-model nrepl-client-map :dispatch_agent :model)
+   ;; Looks for :tools-config {:dispatch_agent {:model :openai/o3}}
+   ;; Then creates model from :models {:openai/o3 {...}}"
+  ([nrepl-client-map tool-key]
+   (get-tool-model nrepl-client-map tool-key :model))
+  ([nrepl-client-map tool-key model-config-key]
+   (when-let [tool-config (config/get-tool-config nrepl-client-map tool-key)]
+     (when-let [model-key (get tool-config model-config-key)]
+       (try
+         (log/info (str "Creating model for " tool-key " from config: " model-key))
+         (create-model-from-config nrepl-client-map model-key)
+         (catch Exception e
+           (log/warn e (str "Failed to create model from config for " tool-key ": " model-key))
+           nil))))))

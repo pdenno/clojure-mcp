@@ -52,19 +52,21 @@ Returns configuration for a specific tool.
 ```
 
 ### `get-tool-model`
-Creates a model for a tool based on its configuration. This is a convenience function that:
+Creates a model for a tool based on its configuration. This function is located in `clojure-mcp.agent.langchain.model` namespace. It's a convenience function that:
 1. Looks up the tool's configuration
 2. Extracts the model key (default: `:model`)
 3. Creates the model using the models configuration
 4. Handles errors gracefully
 
 ```clojure
+(require '[clojure-mcp.agent.langchain.model :as model])
+
 ;; Using default :model key
-(config/get-tool-model nrepl-client-map :dispatch_agent)
+(model/get-tool-model nrepl-client-map :dispatch_agent)
 
 ;; Using custom config key
-(config/get-tool-model nrepl-client-map :code_critique :primary-model)
-(config/get-tool-model nrepl-client-map :code_critique :fallback-model)
+(model/get-tool-model nrepl-client-map :code_critique :primary-model)
+(model/get-tool-model nrepl-client-map :code_critique :fallback-model)
 ```
 
 ## Implementing Tool Configuration
@@ -73,7 +75,8 @@ To add configuration support to a tool:
 
 ```clojure
 (ns my-tool.tool
-  (:require [clojure-mcp.config :as config]))
+  (:require [clojure-mcp.config :as config]
+            [clojure-mcp.agent.langchain.model :as model]))
 
 (defn create-my-tool
   ([nrepl-client-atom]
@@ -81,7 +84,7 @@ To add configuration support to a tool:
   ([nrepl-client-atom model]
    (let [;; Use explicitly provided model or get from config
          final-model (or model
-                        (config/get-tool-model @nrepl-client-atom :my_tool))]
+                        (model/get-tool-model @nrepl-client-atom :my_tool))]
      {:tool-type :my-tool
       :nrepl-client-atom nrepl-client-atom
       :model final-model})))

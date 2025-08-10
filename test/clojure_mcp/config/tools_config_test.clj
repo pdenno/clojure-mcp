@@ -46,7 +46,7 @@
                                         {:model-name "claude-3-haiku-20240307"
                                          :api-key [:env "ANTHROPIC_API_KEY"]}}}}]
         ;; Model creation will succeed with test API key
-        (let [model (config/get-tool-model nrepl-client-map :dispatch_agent)]
+        (let [model (model/get-tool-model nrepl-client-map :dispatch_agent)]
           (is (some? model) "Should create model with test API key")))))
 
   (testing "Creates model with custom config key"
@@ -56,14 +56,14 @@
                                :models {:openai/gpt-4o
                                         {:model-name "gpt-4o"
                                          :api-key [:env "OPENAI_API_KEY"]}}}}]
-        (let [model (config/get-tool-model nrepl-client-map :architect :primary-model)]
+        (let [model (model/get-tool-model nrepl-client-map :architect :primary-model)]
           (is (some? model) "Should create model with test API key")))))
 
   (testing "Returns nil when tool not configured"
     (let [nrepl-client-map {::config/config {:tools-config {}}}]
-      (is (nil? (config/get-tool-model nrepl-client-map :missing_tool)))))
+      (is (nil? (model/get-tool-model nrepl-client-map :missing_tool)))))
 
   (testing "Returns nil when model key not in tool config"
     (let [nrepl-client-map {::config/config
                             {:tools-config {:dispatch_agent {:other-key "value"}}}}]
-      (is (nil? (config/get-tool-model nrepl-client-map :dispatch_agent))))))
+      (is (nil? (model/get-tool-model nrepl-client-map :dispatch_agent))))))

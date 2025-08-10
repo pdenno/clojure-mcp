@@ -24,7 +24,7 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/resources.clj`: Manages resources to be exposed to AI assistants
 - `/src/clojure_mcp/config.clj`: **Enhanced** - Configuration system supporting `.clojure-mcp/config.edn` files
   - Supports `:tools-config` for tool-specific configurations
-  - Provides `get-tool-model` helper to create models from tool configs
+  - Provides `get-tool-config` and `get-tools-config` helpers
 - `/src/clojure_mcp/linting.clj`: Code quality and formatting utilities
 - `/src/clojure_mcp/sse_core.clj`: Server-Sent Events transport implementation
 - `/src/clojure_mcp/sse_main.clj`: Example SSE server using the new pattern

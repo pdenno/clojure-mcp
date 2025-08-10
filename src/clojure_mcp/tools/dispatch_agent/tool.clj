@@ -1,7 +1,8 @@
 (ns clojure-mcp.tools.dispatch-agent.tool
   (:require [clojure-mcp.tool-system :as tool-system]
             [clojure-mcp.tools.dispatch-agent.core :as core]
-            [clojure-mcp.config :as config]))
+            [clojure-mcp.config :as config]
+            [clojure-mcp.agent.langchain.model :as model]))
 
 (defn create-dispatch-agent-tool
   "Creates the dispatch agent tool configuration.
@@ -17,7 +18,7 @@
    (let [;; Check for tool-specific config if no model provided
          final-model (or model
                          ;; Try to get model from config
-                         (config/get-tool-model @nrepl-client-atom :dispatch_agent))]
+                         (model/get-tool-model @nrepl-client-atom :dispatch_agent))]
      {:tool-type :dispatch-agent
       :nrepl-client-atom nrepl-client-atom
       :model final-model})))
