@@ -93,6 +93,8 @@ To add configuration support to a tool:
 ## Currently Supported Tools
 
 - **dispatch_agent**: Supports `:model` configuration for custom AI models
+- **architect**: Supports `:model` configuration for custom AI models
+- **code_critique**: Supports `:model` configuration for custom AI models
 
 ## Extending Configuration
 

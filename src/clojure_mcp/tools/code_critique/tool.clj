@@ -4,21 +4,29 @@
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.tools.code-critique.core :as core]
    [clojure-mcp.linting :as linting]
-   [clojure-mcp.sexp.paren-utils :as paren-utils]))
+   [clojure-mcp.sexp.paren-utils :as paren-utils]
+   [clojure-mcp.config :as config]
+   [clojure-mcp.agent.langchain.model :as model]))
 
 ;; Factory function to create the tool configuration
 (defn create-code-critique-tool
   "Creates the code critique tool configuration.
+   Checks for :tools-config {:code_critique {:model ...}} in the nrepl-client-atom
+   and automatically creates the model if configured.
    
    Args:
    - nrepl-client-atom: Required nREPL client atom
-   - model: Optional pre-built langchain model to use instead of auto-detection"
+   - model: Optional pre-built langchain model to use instead of auto-detection or config"
   ([nrepl-client-atom]
    (create-code-critique-tool nrepl-client-atom nil))
   ([nrepl-client-atom model]
-   {:tool-type :code-critique
-    :nrepl-client-atom nrepl-client-atom
-    :model model}))
+   (let [;; Check for tool-specific config if no model provided
+         final-model (or model
+                         ;; Try to get model from config
+                         (model/get-tool-model @nrepl-client-atom :code_critique))]
+     {:tool-type :code-critique
+      :nrepl-client-atom nrepl-client-atom
+      :model final-model})))
 
 #_(core/critique-code (create-code-critique-tool nil)
                       "(defn a a)")

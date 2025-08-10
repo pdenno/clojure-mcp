@@ -48,6 +48,7 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/glob_files/`: Pattern-based file finding
 - `/src/clojure_mcp/tools/project/`: Project structure analysis
 - `/src/clojure_mcp/tools/code_critique/`: Code quality feedback
+  - **Enhanced**: Auto-configures models from `:tools-config {:code_critique {:model ...}}`
 - `/src/clojure_mcp/tools/think/`: Reflective thinking tool for AI assistants
 - `/src/clojure_mcp/tools/bash/`: Shell command execution
   - **NEW**: Uses a separate nREPL session for isolation
@@ -57,6 +58,7 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/dispatch_agent/`: Agent dispatching for complex tasks
   - **Enhanced**: Auto-configures models from `:tools-config {:dispatch_agent {:model ...}}`
 - `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
+  - **Enhanced**: Auto-configures models from `:tools-config {:architect {:model ...}}`
 - `/src/clojure_mcp/tools/scratch_pad/`: Persistent scratch pad for inter-tool communication
   - `core.clj`: Core functionality for data storage and retrieval
   - `tool.clj`: MCP integration with path-based operations (set_path, get_path, delete_path)

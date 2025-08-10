@@ -1,19 +1,27 @@
 (ns clojure-mcp.tools.architect.tool
   (:require [clojure-mcp.tool-system :as tool-system]
-            [clojure-mcp.tools.architect.core :as core]))
+            [clojure-mcp.tools.architect.core :as core]
+            [clojure-mcp.config :as config]
+            [clojure-mcp.agent.langchain.model :as model]))
 
 (defn create-architect-tool
   "Creates the architect tool configuration.
+   Checks for :tools-config {:architect {:model ...}} in the nrepl-client-atom
+   and automatically creates the model if configured.
    
    Args:
    - nrepl-client-atom: Required nREPL client atom
-   - model: Optional pre-built langchain model to use instead of auto-detection"
+   - model: Optional pre-built langchain model to use instead of auto-detection or config"
   ([nrepl-client-atom]
    (create-architect-tool nrepl-client-atom nil))
   ([nrepl-client-atom model]
-   {:tool-type :architect
-    :nrepl-client-atom nrepl-client-atom
-    :model model}))
+   (let [;; Check for tool-specific config if no model provided
+         final-model (or model
+                         ;; Try to get model from config
+                         (model/get-tool-model @nrepl-client-atom :architect))]
+     {:tool-type :architect
+      :nrepl-client-atom nrepl-client-atom
+      :model final-model})))
 
 (defn architect-tool
   "Returns a tool registration for the architect tool compatible with the MCP system.
