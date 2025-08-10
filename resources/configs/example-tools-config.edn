@@ -1,0 +1,18 @@
+;; Example configuration with tools-config
+{:allowed-directories ["." "src" "test" "resources"]
+ :emacs-notify false
+ :write-file-guard :partial-read
+ :cljfmt true
+ :bash-over-nrepl true
+
+ ;; Configure specific tools with custom settings
+ :tools-config {:dispatch_agent {:model :openai/o3}
+                ;; Add more tool configurations as needed
+                ;; :another_tool {:setting "value"}
+                }
+
+ ;; Optional: Define custom models if using non-default configurations
+ :models {:openai/o3 {:model-name "o3-mini"
+                      :temperature 0.3
+                      :max-tokens 4096
+                      :api-key [:env "OPENAI_API_KEY"]}}}
