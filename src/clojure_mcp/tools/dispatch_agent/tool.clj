@@ -1,19 +1,26 @@
 (ns clojure-mcp.tools.dispatch-agent.tool
   (:require [clojure-mcp.tool-system :as tool-system]
-            [clojure-mcp.tools.dispatch-agent.core :as core]))
+            [clojure-mcp.tools.dispatch-agent.core :as core]
+            [clojure-mcp.config :as config]))
 
 (defn create-dispatch-agent-tool
   "Creates the dispatch agent tool configuration.
+   Checks for :tools-config {:dispatch_agent {:model ...}} in the nrepl-client-atom
+   and automatically creates the model if configured.
    
    Args:
    - nrepl-client-atom: Required nREPL client atom
-   - model: Optional pre-built langchain model to use instead of auto-detection"
+   - model: Optional pre-built langchain model to use instead of auto-detection or config"
   ([nrepl-client-atom]
    (create-dispatch-agent-tool nrepl-client-atom nil))
   ([nrepl-client-atom model]
-   {:tool-type :dispatch-agent
-    :nrepl-client-atom nrepl-client-atom
-    :model model}))
+   (let [;; Check for tool-specific config if no model provided
+         final-model (or model
+                         ;; Try to get model from config
+                         (config/get-tool-model @nrepl-client-atom :dispatch_agent))]
+     {:tool-type :dispatch-agent
+      :nrepl-client-atom nrepl-client-atom
+      :model final-model})))
 
 (defn dispatch-agent-tool
   "Returns a tool registration for the dispatch-agent tool compatible with the MCP system.

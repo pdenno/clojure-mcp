@@ -23,6 +23,8 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/prompts.clj`: Manages system prompts for AI assistants
 - `/src/clojure_mcp/resources.clj`: Manages resources to be exposed to AI assistants
 - `/src/clojure_mcp/config.clj`: **Enhanced** - Configuration system supporting `.clojure-mcp/config.edn` files
+  - Supports `:tools-config` for tool-specific configurations
+  - Provides `get-tool-model` helper to create models from tool configs
 - `/src/clojure_mcp/linting.clj`: Code quality and formatting utilities
 - `/src/clojure_mcp/sse_core.clj`: Server-Sent Events transport implementation
 - `/src/clojure_mcp/sse_main.clj`: Example SSE server using the new pattern
@@ -53,6 +55,7 @@ The project allows AI assistants to:
   - Commands execute in an isolated environment from the main REPL
   - Supports both nREPL and local execution modes via config
 - `/src/clojure_mcp/tools/dispatch_agent/`: Agent dispatching for complex tasks
+  - **Enhanced**: Auto-configures models from `:tools-config {:dispatch_agent {:model ...}}`
 - `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
 - `/src/clojure_mcp/tools/scratch_pad/`: Persistent scratch pad for inter-tool communication
   - `core.clj`: Core functionality for data storage and retrieval
@@ -187,6 +190,11 @@ your-project/
   - Values are configuration maps with model parameters
   - Supports environment variable references: `{:api-key [:env "OPENAI_API_KEY"]}`
   - Falls back to built-in defaults if custom model not found
+- `tools-config`: Map of tool-specific configurations (default: `{}`)
+  - Configure individual tools with custom settings
+  - Keys are tool IDs as keywords (e.g., `:dispatch_agent`, `:architect`)
+  - Values are configuration maps specific to each tool
+  - Example: `:dispatch_agent {:model :openai/o3}` to use a custom model
 
 ### Example Configuration
 ```edn
@@ -203,11 +211,16 @@ your-project/
  :disable-prompts ["scratch-pad-save-as"]
  :enable-resources ["PROJECT_SUMMARY.md" "README.md"]
  :disable-resources ["CLAUDE.md" "LLM_CODE_STYLE.md"]
+ :tools-config {:dispatch_agent {:model :openai/o3}
+                :architect {:model :anthropic/claude-3-haiku-20240307}}
  :models {:openai/my-fast {:model-name "gpt-4o"
                            :temperature 0.3
                            :max-tokens 2048
                            ;; Reference environment variable
                            :api-key [:env "OPENAI_API_KEY"]}
+          :openai/o3 {:model-name "o3-mini"
+                      :temperature 0.2
+                      :api-key [:env "OPENAI_API_KEY"]}
           :anthropic/my-reasoning {:model-name "claude-3-5-sonnet-20241022"
                                    :thinking {:enabled true
                                              :budget-tokens 4096}
