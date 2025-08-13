@@ -4,6 +4,19 @@ This directory contains documentation for creating MCP (Model Context Protocol) 
 
 ## Documentation Files
 
+### Configuration Guides
+
+### [Component Filtering Configuration](component-filtering.md)
+Learn how to control which tools, prompts, and resources are exposed by your MCP server using enable/disable lists. Perfect for creating focused, secure, or specialized MCP servers with only the components you need.
+
+### [Model Configuration](model-configuration.md)
+Configure custom LLM models with your own API keys, endpoints, and parameters. Support for OpenAI, Anthropic, Google Gemini, and more through the LangChain4j integration.
+
+### [Tools Configuration](tools-configuration.md)
+Configure individual tools with custom settings, including model selection for AI-powered tools like dispatch_agent, architect, and code_critique.
+
+### Creating Custom Servers
+
 ### [Creating Your Own Custom MCP Server](custom-mcp-server.md)
 Learn how to create your own personalized MCP server by customizing tools, prompts, and resources. This is the primary way to configure ClojureMCP during the alpha phase, and it's both easy and empowering!
 
