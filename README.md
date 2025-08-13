@@ -290,8 +290,8 @@ Add `clojure-mcp` as an alias in your `~/.clojure/deps.edn`:
   {:mcp 
     {:deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; Required for stdio server
             com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
-                                     :git/tag "v0.1.7-alpha"
-                                     :git/sha "992fe5d"}}
+                                     :git/tag "v0.1.8-alpha"
+                                     :git/sha "457f197"}}
      :exec-fn clojure-mcp.main/start-mcp-server
      :exec-args {:port 7888}}}}
 ```
@@ -712,8 +712,8 @@ being sure to set the port (your nrepl port), shadow port, and shadow build as n
   {:mcp-shadow-dual
     {:deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; Required for stdio server
             com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
-                                     :git/tag "v0.1.7-alpha"
-                                     :git/sha "992fe5d"}}
+                                     :git/tag "v0.1.8-alpha"
+                                     :git/sha "457f197"}}
      :exec-fn clojure-mcp.main-examples.shadow-main/start-mcp-server
      :exec-args {:port 7888 :shadow-port 7889 :shadow-build "app"}}}}
 ```
@@ -1180,8 +1180,8 @@ In order to generate the code index, you will need to set up an alias for this p
   {:index
     {:deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"} ;; Required for stdio server
             com.bhauman/clojure-mcp {:git/url "https://github.com/bhauman/clojure-mcp.git"
-                                     :git/tag "v0.1.7-alpha"
-                                     :git/sha "992fe5d"}}
+                                     :git/tag "v0.1.8-alpha"
+                                     :git/sha "457f197"}}
             :exec-fn clojure-mcp.code-indexer/map-project
             :exec-args {}}}}
 ```
