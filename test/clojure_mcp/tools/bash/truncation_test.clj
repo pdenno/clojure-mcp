@@ -29,7 +29,7 @@
           long-content (apply str (repeat 10000 "x"))
           ;; Command that outputs to both stdout and stderr
           command (str "echo '" long-content "' && echo '" long-content "' >&2")
-          result (bash-core/execute-bash-command nil {:command command})]
+          result (bash-core/execute-bash-command nil {:command command :timeout-ms 30000})]
 
       ;; Check that outputs were truncated
       (is (< (count (:stdout result)) (count long-content)))
@@ -49,7 +49,7 @@
 (deftest test-execute-bash-command-short-output
   (testing "execute-bash-command doesn't truncate short outputs"
     (let [command "echo 'Hello stdout' && echo 'Hello stderr' >&2"
-          result (bash-core/execute-bash-command nil {:command command})]
+          result (bash-core/execute-bash-command nil {:command command :timeout-ms 30000})]
 
       ;; Check outputs are not truncated
       (is (= "Hello stdout" (str/trim (:stdout result))))

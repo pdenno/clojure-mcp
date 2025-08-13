@@ -45,22 +45,28 @@
                                               :bash-over-nrepl false}}
           client-atom-local (atom mock-client-local)]
 
-      ;; Create tools
-      (let [tool-nrepl (bash-tool/create-bash-tool client-atom-nrepl)
-            tool-local (bash-tool/create-bash-tool client-atom-local)
-            inputs {:command "echo test"
-                    :working-directory (System/getProperty "user.dir")}]
+      ;; Mock the session creation and execution functions
+      (with-redefs [bash-tool/create-bash-over-nrepl-session
+                    (fn [client]
+                      ;; Return a mock session when bash-over-nrepl is true
+                      (when (config/get-bash-over-nrepl client)
+                        {:mock-session true}))
 
-        ;; Mock the execution functions
-        (with-redefs [bash-core/execute-bash-command-nrepl
-                      (fn [_ _]
-                        (swap! nrepl-calls inc)
-                        {:exit-code 0 :stdout "nrepl" :stderr "" :timed-out false})
+                    bash-core/execute-bash-command-nrepl
+                    (fn [_ _]
+                      (swap! nrepl-calls inc)
+                      {:exit-code 0 :stdout "nrepl" :stderr "" :timed-out false})
 
-                      bash-core/execute-bash-command
-                      (fn [_ _]
-                        (swap! local-calls inc)
-                        {:exit-code 0 :stdout "local" :stderr "" :timed-out false})]
+                    bash-core/execute-bash-command
+                    (fn [_ _]
+                      (swap! local-calls inc)
+                      {:exit-code 0 :stdout "local" :stderr "" :timed-out false})]
+
+        ;; Create tools (must be inside with-redefs to get mocked session)
+        (let [tool-nrepl (bash-tool/create-bash-tool client-atom-nrepl)
+              tool-local (bash-tool/create-bash-tool client-atom-local)
+              inputs {:command "echo test"
+                      :working-directory (System/getProperty "user.dir")}]
 
           ;; Execute with nREPL config
           (let [result-nrepl (tool-system/execute-tool tool-nrepl inputs)]

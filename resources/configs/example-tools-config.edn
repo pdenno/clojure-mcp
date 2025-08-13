@@ -9,6 +9,9 @@
  :tools-config {:dispatch_agent {:model :openai/o3}
                 :architect {:model :openai/gpt-4o}
                 :code_critique {:model :anthropic/claude-3-haiku-20240307}
+                :bash {:default-timeout-ms 60000 ; Default timeout in milliseconds
+                       :working-dir "/opt/project" ; Default working directory
+                       :bash-over-nrepl true} ; Override global bash-over-nrepl
                 ;; Add more tool configurations as needed
                 ;; :another_tool {:setting "value"}
                 }

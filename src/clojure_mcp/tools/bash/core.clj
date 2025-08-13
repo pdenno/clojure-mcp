@@ -13,7 +13,6 @@
 
 ;; 3 minutes? some test suites take much longer.
 ;; TODO this should go into the config.
-(def ^:private default-timeout-ms 180000)
 
 ;; this is pretty useless
 (def ^:private disallowed-commands
@@ -47,7 +46,8 @@
 (defn execute-bash-command
   [_ {:keys [command working-directory timeout-ms] :as args}]
   (log/debug "Using local bash command: " command)
-  (let [timeout-ms (or timeout-ms default-timeout-ms)
+  (let [;; timeout-ms is now required - should be provided by tool
+        _ (assert timeout-ms "timeout-ms is required")
         ;; Use same truncation limit as nREPL for consistency
         truncation-limit (int (* nrepl/truncation-length 0.85))
         max-stderr-length (quot truncation-limit 2)]
@@ -145,7 +145,7 @@
             (format "(when %s (.directory pb (java.io.File. %s)))"
                     (pr-str working-directory) (pr-str working-directory))
             "nil  ;; no working directory specified")
-          (or timeout-ms default-timeout-ms)
+          timeout-ms
           ;; should be less than overall nrepl limit
           (int (* nrepl/truncation-length 0.85))))
 
@@ -168,60 +168,61 @@ EDN parsing failed: %s\nRaw result: %s"
 (defn execute-bash-command-nrepl
   [nrepl-client-atom {:keys [command working-directory timeout-ms session] :as args}]
   (log/debug "Using nREPL bash command: " command)
-  (let [timeout-ms (or timeout-ms default-timeout-ms)]
-    (when-not (command-allowed? command)
-      (throw (ex-info "Command not allowed due to security restrictions"
-                      {:command command
-                       :error-details "The command contains restricted operations"})))
-    (let [clj-shell-code (generate-shell-eval-code
-                          command
-                          working-directory
-                          timeout-ms)
-          eval-timeout-ms (+ 5000 timeout-ms)
-          result (eval-core/evaluate-code
-                  @nrepl-client-atom
-                  (cond-> {:code clj-shell-code
-                           :timeout-ms eval-timeout-ms}
-                    session (assoc :session session)))
-          output-map (into {} (:outputs result))
-          inner-value (:value output-map)]
-      (when (:error result)
-        (log/warn "REPL evaluation failed for bash command"
-                  {:command command
-                   :nrelp-eval-output-map output-map
-                   :working-directory working-directory
-                   :timeout-ms timeout-ms
-                   :eval-timeout-ms eval-timeout-ms
-                   :error result}))
-      (if (not (:error result))
-        (try
-          ;; this is expected to work
-          (edn/read-string inner-value)
-          (catch Exception e
-            (log/error e "Failed to parse bash command result as EDN"
-                       {:command command
-                        :nrepl-eval-output-map output-map
-                        :inner-value inner-value
-                        :result result})
-            (internal-error-result e inner-value)))
-        (try
-          ;; this is expected to fail
-          (edn/read-string inner-value)
-          (catch Exception e
-            (log/error "Bash command evaluation failed completely"
-                       {:command command
-                        :nrepl-eval-output-map output-map
-                        :inner-value inner-value
-                        :result result})
-            (internal-error-result
-             e
-             inner-value
-             {:stderr (str "Bash command failed to execute. "
-                           "This COULD be an error INTERNAL to the bash tool "
-                           "and probably not due to the command submitted:\n"
-                           "command: " command
-                           inner-value)
-              :error "bash-command-failed"})))))))
+  ;; timeout-ms is now required - should be provided by tool
+  (assert timeout-ms "timeout-ms is required")
+  (when-not (command-allowed? command)
+    (throw (ex-info "Command not allowed due to security restrictions"
+                    {:command command
+                     :error-details "The command contains restricted operations"})))
+  (let [clj-shell-code (generate-shell-eval-code
+                        command
+                        working-directory
+                        timeout-ms)
+        eval-timeout-ms (+ 5000 timeout-ms)
+        result (eval-core/evaluate-code
+                @nrepl-client-atom
+                (cond-> {:code clj-shell-code
+                         :timeout-ms eval-timeout-ms}
+                  session (assoc :session session)))
+        output-map (into {} (:outputs result))
+        inner-value (:value output-map)]
+    (when (:error result)
+      (log/warn "REPL evaluation failed for bash command"
+                {:command command
+                 :nrelp-eval-output-map output-map
+                 :working-directory working-directory
+                 :timeout-ms timeout-ms
+                 :eval-timeout-ms eval-timeout-ms
+                 :error result}))
+    (if (not (:error result))
+      (try
+        ;; this is expected to work
+        (edn/read-string inner-value)
+        (catch Exception e
+          (log/error e "Failed to parse bash command result as EDN"
+                     {:command command
+                      :nrepl-eval-output-map output-map
+                      :inner-value inner-value
+                      :result result})
+          (internal-error-result e inner-value)))
+      (try
+        ;; this is expected to fail
+        (edn/read-string inner-value)
+        (catch Exception e
+          (log/error "Bash command evaluation failed completely"
+                     {:command command
+                      :nrepl-eval-output-map output-map
+                      :inner-value inner-value
+                      :result result})
+          (internal-error-result
+           e
+           inner-value
+           {:stderr (str "Bash command failed to execute. "
+                         "This COULD be an error INTERNAL to the bash tool "
+                         "and probably not due to the command submitted:\n"
+                         "command: " command
+                         inner-value)
+            :error "bash-command-failed"}))))))
 
 (comment
   (require '[clojure-mcp.config :as config])

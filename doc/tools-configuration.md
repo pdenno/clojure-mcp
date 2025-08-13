@@ -20,7 +20,10 @@ Many tools can be configured to use specific AI models. The configuration system
 {:tools-config {:dispatch_agent {:model :openai/o3}
                 :architect {:model :anthropic/claude-3-haiku-20240307}
                 :code_critique {:primary-model :openai/gpt-4o
-                               :fallback-model :anthropic/claude-3-haiku-20240307}}
+                               :fallback-model :anthropic/claude-3-haiku-20240307}
+                :bash {:default-timeout-ms 60000
+                       :working-dir "/opt/project"
+                       :bash-over-nrepl false}}
  
  ;; Define the models referenced above
  :models {:openai/o3 {:model-name "o3-mini"
@@ -92,9 +95,18 @@ To add configuration support to a tool:
 
 ## Currently Supported Tools
 
+### AI-Powered Tools
+
 - **dispatch_agent**: Supports `:model` configuration for custom AI models
 - **architect**: Supports `:model` configuration for custom AI models
 - **code_critique**: Supports `:model` configuration for custom AI models
+
+### Other Configurable Tools
+
+- **bash**: Command execution configuration
+  - `:default-timeout-ms` - Default timeout in milliseconds (default: `180000` for 3 minutes)
+  - `:working-dir` - Default working directory for commands (uses nrepl-user-dir if not set)
+  - `:bash-over-nrepl` - Override global bash-over-nrepl setting (true/false)
 
 ## Extending Configuration
 
