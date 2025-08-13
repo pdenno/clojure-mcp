@@ -1,0 +1,89 @@
+;; Example configuration for component filtering
+;; This file demonstrates how to control which tools, prompts, and resources
+;; are exposed by your MCP server
+
+{;; ===================
+ ;; TOOLS FILTERING
+ ;; ===================
+
+ ;; Option 1: Enable only specific tools (allowlist approach)
+ ;; Uncomment to use only these tools:
+ ;; :enable-tools [:clojure-eval :read-file :file-write :grep :glob-files]
+
+ ;; Option 2: Disable specific tools (denylist approach) 
+ ;; Uncomment to use all tools except these:
+ ;; :disable-tools [:dispatch-agent :architect :code-critique]
+
+ ;; Option 3: Minimal REPL-only configuration
+ ;; :enable-tools [:clojure-eval]
+
+ ;; Option 4: Read-only exploration (no file writes or code execution)
+ ;; :enable-tools [:read-file :grep :glob-files :LS :clojure-inspect-project :think]
+
+ ;; ===================
+ ;; PROMPTS FILTERING
+ ;; ===================
+
+ ;; Enable only specific prompts
+ ;; :enable-prompts ["clojure_repl_system_prompt" "chat-session-summarize"]
+
+ ;; Or disable specific prompts
+ ;; :disable-prompts ["scratch-pad-load" "scratch-pad-save-as"]
+
+ ;; Minimal prompt configuration
+ ;; :enable-prompts ["clojure_repl_system_prompt"]
+
+ ;; ===================
+ ;; RESOURCES FILTERING
+ ;; ===================
+
+ ;; Enable only specific resources
+ ;; :enable-resources ["PROJECT_SUMMARY.md" "README.md"]
+
+ ;; Or disable specific resources
+ ;; :disable-resources ["CLAUDE.md" "LLM_CODE_STYLE.md"]
+
+ ;; No resources at all
+ ;; :enable-resources []
+
+ ;; ===================
+ ;; COMPLETE EXAMPLES
+ ;; ===================
+
+ ;; Example 1: Minimal REPL Server
+ ;; Uncomment this entire block for a minimal REPL-only server:
+ #_{:enable-tools [:clojure-eval]
+    :enable-prompts ["clojure_repl_system_prompt"]
+    :enable-resources []}
+
+ ;; Example 2: Read-Only Code Review Server
+ ;; Uncomment this entire block for read-only exploration:
+ #_{:enable-tools [:read-file :grep :glob-files :LS :clojure-inspect-project :think]
+    :enable-prompts ["clojure_repl_system_prompt"]
+    :enable-resources ["PROJECT_SUMMARY.md" "README.md"]}
+
+ ;; Example 3: Development Server Without Agents
+ ;; Uncomment this entire block for full dev capabilities minus agents:
+ #_{:disable-tools [:dispatch-agent :architect :code-critique]
+    :disable-resources ["CLAUDE.md"]}
+
+ ;; Example 4: File Operations Only
+ ;; Uncomment this entire block for file-focused operations:
+ #_{:enable-tools [:read-file :file-edit :file-write :bash :grep :glob-files]
+    :enable-prompts ["clojure_repl_system_prompt"]
+    :enable-resources ["PROJECT_SUMMARY.md"]}
+
+ ;; ===================
+ ;; NOTES
+ ;; ===================
+ ;; 
+ ;; - Tools can be specified as keywords (:tool-name) or strings ("tool_name")
+ ;; - Prompts and resources must be specified as strings
+ ;; - Enable lists: When specified, ONLY those items are enabled
+ ;; - Disable lists: Applied after enable filtering to remove items
+ ;; - Empty enable list [] means nothing is enabled
+ ;; - nil or missing enable list means all items start enabled
+ ;; 
+ ;; Copy this file to .clojure-mcp/config.edn in your project and
+ ;; uncomment the configuration that matches your needs.
+ }

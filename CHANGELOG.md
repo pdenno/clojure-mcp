@@ -1,5 +1,98 @@
 # Changelog
 
+## [0.1.8-alpha] - 2025-08-13
+
+### What's New
+
+This release brings major configuration enhancements and improved Clojure code editing:
+
+** Key Highlights:**
+- **Custom LLM Models** - Define your own model configurations in `.clojure-mcp/config.edn` with environment variable support for API keys
+- **Scittle Support** - Connect directly to Scittle nREPL without configuration
+- **Component Filtering** - Choose exactly which tools, prompts, and resources your server exposes
+- **Improved Code Editing** - Much better handling of preceeding comments and sexp editing
+- **Tool Configuration** - Configure individual tools with custom settings including model selection
+
+**Example Model Configuration:**
+```edn
+:models {:openai/my-fast {:model-name "gpt-4o"
+                          :api-key [:env "OPENAI_API_KEY"]
+                          :base-url [:env "OPENROUTER_URL"]
+                          :temperature 0.3}
+         :anthropic/my-claude {:model-name "claude-3-5-sonnet-20241022"
+                              :temperature 0.7}}
+
+:tools-config {:dispatch_agent {:model :openai/my-fast}}
+```
+
+**Documentation:**
+
+These docs are incomplete but should get you started...
+
+- [Component Filtering Guide](https://github.com/bhauman/clojure-mcp/blob/main/doc/component-filtering.md) - Control which components are exposed
+- [Model Configuration Guide](https://github.com/bhauman/clojure-mcp/blob/main/doc/model-configuration.md)
+- [Tools Configuration Guide](https://github.com/bhauman/clojure-mcp/blob/main/doc/tools-configuration.md)
+- [Default Models Reference](https://github.com/bhauman/clojure-mcp/blob/main/src/clojure_mcp/agent/langchain/model.clj)
+
+**Coming Soon:**
+- Editing agent for cleaner context management
+- Expanded tool configuration options
+- Custom resources, prompts, tools, and agents definable in config
+
+#### Custom Model Configuration System
+Complete support for user-defined LLM model configurations via `.clojure-mcp/config.edn`:
+- **Named model definitions**: Define custom models under the `:models` key with provider-specific settings
+- **Environment variable support**: Secure API key management with `[:env "VAR_NAME"]` syntax
+- **Provider flexibility**: Support for OpenAI, Anthropic, Google Gemini
+- **Validation with Clojure spec**: Ensures configuration correctness at startup
+- **Fallback to defaults**: Built-in models remain available when custom ones aren't defined
+
+#### Tool-Specific Configuration System
+New `:tools-config` key for configuring individual tools:
+- **Per-tool settings**: Configure tools like `dispatch_agent`, `architect`, and `code_critique` with custom models
+- **Example**: `:tools-config {:dispatch_agent {:model :openai/o3}}`
+
+#### Component Filtering System
+Fine-grained control over which components are enabled:
+- **Tool filtering**: `:enable-tools` and `:disable-tools` configuration options
+- **Prompt filtering**: `:enable-prompts` and `:disable-prompts` for controlling AI prompts
+- **Resource filtering**: `:enable-resources` and `:disable-resources` for managing exposed files
+- **Flexible formats**: Support for both keyword and string identifiers
+
+#### S-Expression Editing Improvements (#77)
+Major revamp of how s-expression editing works:
+- **Better pattern matching**: More reliable matching of Clojure forms
+- **Private function support**: `clojure_edit` now matches private `def-` and `defn-` forms flexibly
+- **Comment-aware editing**: Improved handling of comments in top-level forms
+- **Scittle support**: Initial support for Scittle (browser Clojure) files
+- **Basilisp extension**: `.lpy` files now recognized as Clojure for editing
+
+### Added
+- **Claude 4.1 and GPT-5 models**: Support for latest AI models
+- **5 additional OpenAI models**: Expanded model selection with simplified names
+- **Code index documentation**: Initial documentation for code indexing feature (#76)
+- **Example configuration files**:
+  - `resources/configs/example-models-with-provider.edn` for model configuration
+  - `resources/configs/example-tools-config.edn` for tool-specific settings
+  - `resources/configs/example-component-filtering.edn` for component filtering
+- **Model configuration documentation**: Comprehensive guide at `doc/model-configuration.md`
+- **Bash tool enhancements**:
+  - Configurable timeout with `timeout_ms` parameter
+  - Additional configuration options for execution control
+
+### Changed
+- **Write-file-guard default**: Changed from `:full-read` to `:partial-read` for better usability
+- **LangChain4j upgrade**: Updated to version 1.2.0 for improved model support
+  - Unified model configuration system
+- **Tool ID override**: Tool IDs can now be overridden for better customization
+- **Dispatch agent context**: Added project info to dispatch agent context (#78, fixes #71)
+
+### Fixed
+- **CI environment compatibility**: Tests now work without API keys in CI environment
+- **Test reliability**: Various test fixes for improved stability
+- **Comment handling**: Fixed extra spaces being added before comments in edited code
+- **Tool call prefixing**: Added note about correctly prefixing tool calls to system prompt
+
 ## [0.1.7-alpha] - 2025-07-22
 
 Note the major changes listed in `0.1.7-alpha-pre` below which are part of this release.
