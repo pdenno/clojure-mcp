@@ -226,8 +226,8 @@ specific workflow needs.
 
 ### Prerequisites
 
-- [Clojure](https://clojure.org/guides/install_clojure) (1.11 or later)
-- [Java](https://openjdk.org/) (JDK 11 or later)
+- [Clojure](https://clojure.org/guides/install_clojure)
+- [Java](https://openjdk.org/) (JDK 17 or later)
 - [Claude Desktop](https://claude.ai/download) (for the best experience)
 - **Optional but HIGHLY recommended**: [ripgrep](https://github.com/BurntSushi/ripgrep#installation) for better `grep` and `glob_files` performance
 

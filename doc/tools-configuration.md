@@ -17,23 +17,22 @@ Many tools can be configured to use specific AI models. The configuration system
 ### Example Configuration
 
 ```edn
-{:tools-config {:dispatch_agent {:model :openai/o3}
-                :architect {:model :anthropic/claude-3-haiku-20240307}
-                :code_critique {:primary-model :openai/gpt-4o
-                               :fallback-model :anthropic/claude-3-haiku-20240307}
+{:tools-config {:dispatch_agent {:model :openai/my-o3}
+                :architect {:model :anthropic/my-claude-3}
+                :code_critique {:model :openai/my-gpt-4o}
                 :bash {:default-timeout-ms 60000
                        :working-dir "/opt/project"
                        :bash-over-nrepl false}}
  
  ;; Define the models referenced above
- :models {:openai/o3 {:model-name "o3-mini"
+ :models {:openai/my-o3 {:model-name "o3-mini"
                       :temperature 0.2
                       :api-key [:env "OPENAI_API_KEY"]}
-          :openai/gpt-4o {:model-name "gpt-4o"
+          :openai/my-gpt-4o {:model-name "gpt-4o"
                           :temperature 0.3
                           :api-key [:env "OPENAI_API_KEY"]}
-          :anthropic/claude-3-haiku-20240307 {:model-name "claude-3-haiku-20240307"
-                                              :api-key [:env "ANTHROPIC_API_KEY"]}}}
+          :anthropic/my-claude-3 {:model-name "claude-3-haiku-20240307"
+                                  :api-key [:env "ANTHROPIC_API_KEY"]}}}
 ```
 
 ## API Functions
@@ -107,14 +106,3 @@ To add configuration support to a tool:
   - `:default-timeout-ms` - Default timeout in milliseconds (default: `180000` for 3 minutes)
   - `:working-dir` - Default working directory for commands (uses nrepl-user-dir if not set)
   - `:bash-over-nrepl` - Override global bash-over-nrepl setting (true/false)
-
-## Extending Configuration
-
-Tools can use any configuration keys they need. Common patterns include:
-- `:model` - Primary AI model to use
-- `:fallback-model` - Backup model if primary fails
-- `:timeout` - Operation timeout values
-- `:max-retries` - Retry configuration
-- `:enabled-features` - Feature flags
-
-The configuration system is flexible and can be extended as needed for each tool's requirements.
