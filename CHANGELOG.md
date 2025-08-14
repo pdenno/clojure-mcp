@@ -7,27 +7,28 @@
 This release brings major configuration enhancements and improved
 Clojure code editing.
 
-In terms of Clojure editing, these improvements are significant, there
-used to be some edit thrashing around editing functions with comments
-that directly preceed them. This is now fixed and if the LLM want to
-replace a function along with its preceeding comments clojure-mcp does
-so.
+In terms of Clojure editing, these improvements are significant. There
+used to be some edit thrashing when editing functions with comments
+that directly preceed them. This is now fixed. When the LLM wants to
+replace a function along with its preceeding comments, clojure-mcp does
+the right thing.
 
-The sexp replacement has been revamped yet again. Sexpr replacement is
-much better while also being preceeding comment aware as well.
+The sexp replacement has been revamped yet again. Sexpr replacement
+will now succeed most of the time while being preceeding comment aware
+as well.
 
-The other big step forward is in adding custom model configuration in
-the config.edn. This is directly a result of `langchain4j` improving
-its model support. Now you can define custom model configurations to
-be used by the agent tools.
+The other big step forward is the addition of custom model
+configuration in the `config.edn`. This is a direct result of
+`langchain4j` improving its model support. Now you can define custom
+model configurations to be used by the agent tools.
 
-Other `.clojure-mcp/config.edn` configuration improvments allow you to 
+Other `.clojure-mcp/config.edn` configuration improvements allow you to 
 * `:enable-tools` `:disable-tools`
 * `:enable-prompts` `:disable-prompts`
 * `:enable-resources` `:disable-resources`
 * add tool specific configuration in `:tools-config`
 
-With all these improvements I'm going to remove the `-alpha` from the next release tag.
+With all these changes, I'm going to be removing the `-alpha` from the next release tag.
 
 ** Key Highlights:**
 - **Custom LLM Models** - Define your own model configurations in `.clojure-mcp/config.edn` with environment variable support for API keys
