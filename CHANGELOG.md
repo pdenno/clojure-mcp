@@ -7,14 +7,27 @@
 This release brings major configuration enhancements and improved
 Clojure code editing.
 
-In terms of clojure editing the improvements are significant, there used to be
-some thrashing around editing functions with comments that directly
-preceed them. Apparently the LLM treats these comments are part of the
-same semantic unit as the function just like we do.
+In terms of Clojure editing, these improvements are significant, there
+used to be some edit thrashing around editing functions with comments
+that directly preceed them. This is now fixed and if the LLM want to
+replace a function along with its preceeding comments clojure-mcp does
+so.
 
-I've learned a lot more about using clj-rewrite and now the sexp
-replacement editing works much much better while also being preceeding
-comment aware as well.
+The sexp replacement has been revamped yet again. Sexpr replacement is
+much better while also being preceeding comment aware as well.
+
+The other big step forward is in adding custom model configuration in
+the config.edn. This is directly a result of `langchain4j` improving
+its model support. Now you can define custom model configurations to
+be used by the agent tools.
+
+Other `.clojure-mcp/config.edn` configuration improvments allow you to 
+* `:enable-tools` `:disable-tools`
+* `:enable-prompts` `:disable-prompts`
+* `:enable-resources` `:disable-resources`
+* add tool specific configuration in `:tools-config`
+
+With all these improvements I'm going to remove the `-alpha` from the next release tag.
 
 ** Key Highlights:**
 - **Custom LLM Models** - Define your own model configurations in `.clojure-mcp/config.edn` with environment variable support for API keys

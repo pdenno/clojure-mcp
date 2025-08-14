@@ -34,6 +34,27 @@ Add a `:models` map to your `.clojure-mcp/config.edn`:
                                 :max-tokens 4096}}}
 ```
 
+## Open Router to access other models with the OpenAi Client
+
+```clojure
+{:models {:openai/glm {:model-name "z-ai/glm-4.5"
+                       :api-key [:env "OPENROUTER_API_KEY"]
+                       :base-url "https://openrouter.ai/api/v1/chat/completions"
+                       :temperature 1}}}
+```
+
+In this case keyword namespace `:openai/` is what configures the provider api.
+
+You can also configure the provider like so:
+
+```clojure
+{:models {:glm-4-5 {:provider :openai
+                    :model-name "z-ai/glm-4.5"
+                    :api-key [:env "OPENROUTER_API_KEY"]
+                    :base-url "https://openrouter.ai/api/v1/chat/completions"
+                    :temperature 1}}}
+```
+
 ## Model Configuration Examples
 
 ### Basic Models
