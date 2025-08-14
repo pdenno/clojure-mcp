@@ -4,26 +4,39 @@
 
 ### What's New
 
-This release brings major configuration enhancements and improved Clojure code editing:
+This release brings major configuration enhancements and improved
+Clojure code editing.
+
+In terms of clojure editing the improvements are significant, there used to be
+some thrashing around editing functions with comments that directly
+preceed them. Apparently the LLM treats these comments are part of the
+same semantic unit as the function just like we do.
+
+I've learned a lot more about using clj-rewrite and now the sexp
+replacement editing works much much better while also being preceeding
+comment aware as well.
 
 ** Key Highlights:**
 - **Custom LLM Models** - Define your own model configurations in `.clojure-mcp/config.edn` with environment variable support for API keys
-- **Scittle Support** - Connect directly to Scittle nREPL without configuration
+- **Scittle Support** - Connect directly to Scittle nREPL without configuration - fun stuff!
 - **Component Filtering** - Choose exactly which tools, prompts, and resources your server exposes
 - **Improved Code Editing** - Much better handling of preceeding comments and sexp editing
 - **Tool Configuration** - Configure individual tools with custom settings including model selection
 
 **Example Model Configuration:**
 ```edn
-:models {:openai/my-fast {:model-name "gpt-4o"
-                          :api-key [:env "OPENAI_API_KEY"]
-                          :base-url [:env "OPENROUTER_URL"]
-                          :temperature 0.3}
+:models {;; use the OpenAI client to connect to other models
+         :openai/glm {:model-name "z-ai/glm-4.5"
+                      :api-key [:env "OPENROUTER_API_KEY"]
+                      :base-url [:env "OPENROUTER_BASE_URL"]
+                      :temperature 1}
          :anthropic/my-claude {:model-name "claude-3-5-sonnet-20241022"
-                              :temperature 0.7}}
+                               :temperature 0.7}}
 
 :tools-config {:dispatch_agent {:model :openai/my-fast}}
 ```
+
+Currently these defined models are mainly used for the built-in agents, but if clojure-mcp had a cli that you could send prompts to...
 
 **Documentation:**
 
@@ -32,7 +45,7 @@ These docs are incomplete but should get you started...
 - [Component Filtering Guide](https://github.com/bhauman/clojure-mcp/blob/main/doc/component-filtering.md) - Control which components are exposed
 - [Model Configuration Guide](https://github.com/bhauman/clojure-mcp/blob/main/doc/model-configuration.md)
 - [Tools Configuration Guide](https://github.com/bhauman/clojure-mcp/blob/main/doc/tools-configuration.md)
-- [Default Models Reference](https://github.com/bhauman/clojure-mcp/blob/main/src/clojure_mcp/agent/langchain/model.clj)
+- [Default Models](https://github.com/bhauman/clojure-mcp/blob/main/src/clojure_mcp/agent/langchain/model.clj)
 
 **Coming Soon:**
 - Editing agent for cleaner context management
@@ -42,10 +55,9 @@ These docs are incomplete but should get you started...
 #### Custom Model Configuration System
 Complete support for user-defined LLM model configurations via `.clojure-mcp/config.edn`:
 - **Named model definitions**: Define custom models under the `:models` key with provider-specific settings
-- **Environment variable support**: Secure API key management with `[:env "VAR_NAME"]` syntax
-- **Provider flexibility**: Support for OpenAI, Anthropic, Google Gemini
-- **Validation with Clojure spec**: Ensures configuration correctness at startup
-- **Fallback to defaults**: Built-in models remain available when custom ones aren't defined
+- Environment API key support with `[:env "VAR_NAME"]` syntax
+- Support for OpenAI, Anthropic, Google Gemini including setting the `:base-url` for the OpenAi client
+- Built-in default models remain available when custom ones aren't defined
 
 #### Tool-Specific Configuration System
 New `:tools-config` key for configuring individual tools:
@@ -57,13 +69,14 @@ Fine-grained control over which components are enabled:
 - **Tool filtering**: `:enable-tools` and `:disable-tools` configuration options
 - **Prompt filtering**: `:enable-prompts` and `:disable-prompts` for controlling AI prompts
 - **Resource filtering**: `:enable-resources` and `:disable-resources` for managing exposed files
-- **Flexible formats**: Support for both keyword and string identifiers
 
 #### S-Expression Editing Improvements (#77)
 Major revamp of how s-expression editing works:
 - **Better pattern matching**: More reliable matching of Clojure forms
 - **Private function support**: `clojure_edit` now matches private `def-` and `defn-` forms flexibly
 - **Comment-aware editing**: Improved handling of comments in top-level forms
+
+#### Multi-dialect
 - **Scittle support**: Initial support for Scittle (browser Clojure) files
 - **Basilisp extension**: `.lpy` files now recognized as Clojure for editing
 
@@ -71,11 +84,6 @@ Major revamp of how s-expression editing works:
 - **Claude 4.1 and GPT-5 models**: Support for latest AI models
 - **5 additional OpenAI models**: Expanded model selection with simplified names
 - **Code index documentation**: Initial documentation for code indexing feature (#76)
-- **Example configuration files**:
-  - `resources/configs/example-models-with-provider.edn` for model configuration
-  - `resources/configs/example-tools-config.edn` for tool-specific settings
-  - `resources/configs/example-component-filtering.edn` for component filtering
-- **Model configuration documentation**: Comprehensive guide at `doc/model-configuration.md`
 - **Bash tool enhancements**:
   - Configurable timeout with `timeout_ms` parameter
   - Additional configuration options for execution control
@@ -83,14 +91,7 @@ Major revamp of how s-expression editing works:
 ### Changed
 - **Write-file-guard default**: Changed from `:full-read` to `:partial-read` for better usability
 - **LangChain4j upgrade**: Updated to version 1.2.0 for improved model support
-  - Unified model configuration system
-- **Tool ID override**: Tool IDs can now be overridden for better customization
 - **Dispatch agent context**: Added project info to dispatch agent context (#78, fixes #71)
-
-### Fixed
-- **CI environment compatibility**: Tests now work without API keys in CI environment
-- **Test reliability**: Various test fixes for improved stability
-- **Comment handling**: Fixed extra spaces being added before comments in edited code
 - **Tool call prefixing**: Added note about correctly prefixing tool calls to system prompt
 
 ## [0.1.7-alpha] - 2025-07-22
