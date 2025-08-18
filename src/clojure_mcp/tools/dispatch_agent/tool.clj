@@ -2,7 +2,9 @@
   (:require [clojure-mcp.tool-system :as tool-system]
             [clojure-mcp.tools.dispatch-agent.core :as core]
             [clojure-mcp.config :as config]
-            [clojure-mcp.agent.langchain.model :as model]))
+            [clojure-mcp.agent.langchain :as chain]
+            [clojure-mcp.agent.langchain.model :as model]
+            [clojure-mcp.agent.general-agent :as general-agent]))
 
 (defn create-dispatch-agent-tool
   "Creates the dispatch agent tool configuration.
@@ -15,13 +17,23 @@
   ([nrepl-client-atom]
    (create-dispatch-agent-tool nrepl-client-atom nil))
   ([nrepl-client-atom model]
-   (let [;; Check for tool-specific config if no model provided
+   (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
+         context-config (config/get-dispatch-agent-context @nrepl-client-atom)
+         ;; Check for tool-specific config if no model provided
          final-model (or model
                          ;; Try to get model from config
-                         (model/get-tool-model @nrepl-client-atom :dispatch_agent))]
+                         (model/get-tool-model @nrepl-client-atom :dispatch_agent)
+                         ;; default to available models
+                         (some-> (chain/agent-model)
+                                 (.build)))]
      {:tool-type :dispatch-agent
       :nrepl-client-atom nrepl-client-atom
-      :model final-model})))
+      :model final-model
+      :system-message core/system-message
+      :context (general-agent/build-context-strings nrepl-client-atom working-directory context-config)
+      :tools (general-agent/build-read-only-tools nrepl-client-atom)
+      :working-directory working-directory
+      :context-config context-config})))
 
 (defn dispatch-agent-tool
   "Returns a tool registration for the dispatch-agent tool compatible with the MCP system.
@@ -81,7 +93,30 @@ Usage notes:
   (core/validate-dispatch-agent-inputs inputs))
 
 (defmethod tool-system/execute-tool :dispatch-agent [tool {:keys [prompt]}]
-  (core/dispatch-agent tool prompt))
+  (let [{:keys [nrepl-client-atom model system-message context
+                tools working-directory context-config]} tool
+        ;; Try to get cached agent or create new one
+        cache-key ::dispatch-agent-service
+        cached-agent (get @nrepl-client-atom cache-key)
+        agent (or cached-agent
+                  (let [new-agent (general-agent/create-general-agent
+                                   {:system-prompt system-message
+                                    :context context
+                                    :tools tools
+                                    :model model
+                                    :memory-size core/MEMORY-SIZE})]
+                    ;; Cache the agent
+                    (swap! nrepl-client-atom assoc cache-key new-agent)
+                    new-agent))]
+
+    ;; Update context if config changed
+    (when (and cached-agent context-config)
+      (let [fresh-context (general-agent/build-context-strings nrepl-client-atom working-directory context-config)]
+        (when (not= context fresh-context)
+          (general-agent/update-agent-context agent fresh-context))))
+
+    ;; Chat with the agent
+    (general-agent/chat-with-agent agent prompt)))
 
 (defmethod tool-system/format-results :dispatch-agent [_ {:keys [result error] :as results}]
   {:result [result]
