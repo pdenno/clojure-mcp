@@ -1,10 +1,37 @@
 (ns clojure-mcp.tools.dispatch-agent.tool
   (:require [clojure-mcp.tool-system :as tool-system]
-            [clojure-mcp.tools.dispatch-agent.core :as core]
             [clojure-mcp.config :as config]
             [clojure-mcp.agent.langchain :as chain]
             [clojure-mcp.agent.langchain.model :as model]
             [clojure-mcp.agent.general-agent :as general-agent]))
+
+(def dispatch-agent-system-message
+  "You are an agent for a Clojure Coding Assistant. Given the user's prompt, you should use the tools available to you to answer the user's question.
+
+You MAY be provided with a project summary and a code-index... Please use these as a starting poing to answering the provided question.
+
+Notes:
+1. IMPORTANT: You should be concise, direct, and to the point, since your responses will be displayed on a command line interface. Answer the user's question directly, without elaboration, explanation, or details. One word answers are best. Avoid introductions, conclusions, and explanations. You MUST avoid text before/after your response, such as \"The answer is <answer>.\", \"Here is the content of the file...\" or \"Based on the information provided, the answer is...\" or \"Here is what I will do next...\".
+2. When relevant, share file names and code snippets relevant to the query
+3. Any file paths you return in your final response MUST be absolute. DO NOT use relative paths.")
+
+(defn validate-dispatch-agent-inputs
+  "Validates inputs for the dispatch-agent function"
+  [inputs]
+  (cond
+    (nil? inputs)
+    (throw (ex-info "Missing inputs" {:error-details ["No input parameters provided"]}))
+
+    (nil? (:prompt inputs))
+    (throw (ex-info "Missing required parameter: prompt"
+                    {:error-details ["The 'prompt' parameter is required"]}))
+
+    (not (string? (:prompt inputs)))
+    (throw (ex-info "Parameter 'prompt' must be a string"
+                    {:error-details [(str "Got: " (type (:prompt inputs)))]}))
+
+    :else
+    inputs))
 
 (defn create-dispatch-agent-tool
   "Creates the dispatch agent tool configuration.
@@ -29,7 +56,7 @@
      {:tool-type :dispatch-agent
       :nrepl-client-atom nrepl-client-atom
       :model final-model
-      :system-message core/system-message
+      :system-message dispatch-agent-system-message
       :context (general-agent/build-context-strings nrepl-client-atom working-directory context-config)
       :tools (general-agent/build-read-only-tools nrepl-client-atom)
       :working-directory working-directory
@@ -90,7 +117,7 @@ Usage notes:
    :required [:prompt]})
 
 (defmethod tool-system/validate-inputs :dispatch-agent [_ inputs]
-  (core/validate-dispatch-agent-inputs inputs))
+  (validate-dispatch-agent-inputs inputs))
 
 (defmethod tool-system/execute-tool :dispatch-agent [tool {:keys [prompt]}]
   (let [{:keys [nrepl-client-atom model system-message context
@@ -104,7 +131,7 @@ Usage notes:
                                     :context context
                                     :tools tools
                                     :model model
-                                    :memory-size core/MEMORY-SIZE})]
+                                    :memory-size general-agent/DEFAULT-MEMORY-SIZE})]
                     ;; Cache the agent
                     (swap! nrepl-client-atom assoc cache-key new-agent)
                     new-agent))]

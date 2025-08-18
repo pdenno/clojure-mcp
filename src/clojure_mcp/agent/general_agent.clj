@@ -11,6 +11,8 @@
    [clojure_mcp.agent.langchain AiService]
    [dev.langchain4j.data.message UserMessage TextContent]))
 
+(def DEFAULT-MEMORY-SIZE 300)
+
 (defn build-read-only-tools
   "Builds the read-only tools for agents.
    These tools are safe for exploration and analysis without modifying files.
@@ -119,7 +121,7 @@ Please use it to inform you as to which files should be investigated.\n=========
      :tools - The tools vector
      :system-message - The system prompt"
   [{:keys [system-prompt context tools memory model memory-size]
-    :or {memory-size 300}}]
+    :or {memory-size DEFAULT-MEMORY-SIZE}}]
   (try
     (when-not model
       (throw (ex-info "Model is required" {:missing :model})))
