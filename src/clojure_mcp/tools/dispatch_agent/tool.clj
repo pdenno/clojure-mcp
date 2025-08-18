@@ -3,17 +3,12 @@
             [clojure-mcp.config :as config]
             [clojure-mcp.agent.langchain :as chain]
             [clojure-mcp.agent.langchain.model :as model]
-            [clojure-mcp.agent.general-agent :as general-agent]))
+            [clojure-mcp.agent.general-agent :as general-agent]
+            [clojure.java.io :as io]))
 
 (def dispatch-agent-system-message
-  "You are an agent for a Clojure Coding Assistant. Given the user's prompt, you should use the tools available to you to answer the user's question.
-
-You MAY be provided with a project summary and a code-index... Please use these as a starting poing to answering the provided question.
-
-Notes:
-1. IMPORTANT: You should be concise, direct, and to the point, since your responses will be displayed on a command line interface. Answer the user's question directly, without elaboration, explanation, or details. One word answers are best. Avoid introductions, conclusions, and explanations. You MUST avoid text before/after your response, such as \"The answer is <answer>.\", \"Here is the content of the file...\" or \"Based on the information provided, the answer is...\" or \"Here is what I will do next...\".
-2. When relevant, share file names and code snippets relevant to the query
-3. Any file paths you return in your final response MUST be absolute. DO NOT use relative paths.")
+  "The system message for the dispatch agent, loaded from resources"
+  (slurp (io/resource "clojure_mcp/tools/dispatch_agent/system_message.md")))
 
 (defn validate-dispatch-agent-inputs
   "Validates inputs for the dispatch-agent function"
