@@ -2,81 +2,39 @@
   "Implementation of the code critique tool using the tool-system multimethod approach."
   (:require
    [clojure-mcp.tool-system :as tool-system]
-   [clojure-mcp.tools.code-critique.core :as core]
    [clojure-mcp.linting :as linting]
    [clojure-mcp.sexp.paren-utils :as paren-utils]
    [clojure-mcp.config :as config]
-   [clojure-mcp.agent.langchain.model :as model]))
+   [clojure-mcp.agent.langchain :as chain]
+   [clojure-mcp.agent.langchain.model :as model]
+   [clojure-mcp.agent.general-agent :as general-agent]
+   [clojure.java.io :as io]
+   [clojure.string :as string]))
 
-;; Factory function to create the tool configuration
-(defn create-code-critique-tool
-  "Creates the code critique tool configuration.
-   Checks for :tools-config {:code_critique {:model ...}} in the nrepl-client-atom
-   and automatically creates the model if configured.
+(def code-critique-system-message-template
+  "The system message template for the code critique tool, loaded from resources"
+  (slurp (io/resource "clojure_mcp/tools/code_critique/system_message.md")))
+
+(def code-critique-description
+  "The default description for the code critique tool, loaded from resources"
+  (slurp (io/resource "clojure_mcp/tools/code_critique/description.md")))
+
+(defn format-system-message
+  "Formats the system message template with the improvement count.
    
    Args:
-   - nrepl-client-atom: Required nREPL client atom
-   - model: Optional pre-built langchain model to use instead of auto-detection or config"
-  ([nrepl-client-atom]
-   (create-code-critique-tool nrepl-client-atom nil))
-  ([nrepl-client-atom model]
-   (let [;; Check for tool-specific config if no model provided
-         final-model (or model
-                         ;; Try to get model from config
-                         (model/get-tool-model @nrepl-client-atom :code_critique))]
-     {:tool-type :code-critique
-      :nrepl-client-atom nrepl-client-atom
-      :model final-model})))
+   - improvement-count: Number of improvements to suggest (default: 2)"
+  [improvement-count]
+  (let [n (or improvement-count 2)
+        nstr (if (= 1 n) "single" (str n))
+        improvement-label (if (> n 1) "improvements" "improvement")]
+    (-> code-critique-system-message-template
+        (string/replace "{improvement_count}" nstr)
+        (string/replace "{improvement_label}" improvement-label))))
 
-#_(core/critique-code (create-code-critique-tool nil)
-                      "(defn a a)")
-
-;; Implement the required multimethods for the code critique tool
-(defmethod tool-system/tool-name :code-critique [_]
-  "code_critique")
-
-(defmethod tool-system/tool-description :code-critique [_]
-  "Starts an interactive code review conversation that provides constructive feedback on your Clojure code.
-  
-  HOW TO USE THIS TOOL:
-  1. Submit your Clojure code for initial critique
-  2. Review the suggestions and implement improvements
-  3. Test your revised code in the REPL
-  4. Submit the updated code for additional feedback
-  5. Continue this cycle until the critique is satisfied
-  
-  This tool initiates a feedback loop where you:
-  - Receive detailed analysis of your code
-  - Implement suggested improvements
-  - Test and verify changes
-  - Get follow-up critique on your revisions
-  
-  The critique examines:
-  - Adherence to Clojure style conventions
-  - Functional programming best practices
-  - Performance optimizations
-  - Readability and maintainability improvements
-  - Idiomatic Clojure patterns
-  
-  Example conversation flow:
-  - You: Submit initial function implementation
-  - Tool: Provides feedback on style and structure
-  - You: Revise code based on suggestions and test in REPL
-  - Tool: Reviews updates and suggests further refinements
-  - Repeat until code quality goals are achieved
-  
-  Perfect for iterative learning and continuous code improvement.")
-
-;; TODO file-path and optional symbol 
-(defmethod tool-system/tool-schema :code-critique [_]
-  {:type :object
-   :properties {:code {:type :string
-                       :description "The Clojure code to analyze and critique"}
-                :context {:type :string
-                          :description "Optional context from previous conversation or system state"}}
-   :required [:code]})
-
-(defmethod tool-system/validate-inputs :code-critique [_ inputs]
+(defn validate-code-critique-inputs
+  "Validates inputs for the code critique function"
+  [inputs]
   (let [{:keys [code context]} inputs]
     (when-not code
       (throw (ex-info "Missing required parameter: code"
@@ -112,8 +70,104 @@
         ;; No lint errors, return inputs with original code
         inputs))))
 
-(defmethod tool-system/execute-tool :code-critique [tool inputs]
-  (core/critique-code tool inputs))
+;; Factory function to create the tool configuration
+(defn create-code-critique-tool
+  "Creates the code critique tool configuration.
+   Checks for :tools-config {:code_critique {:model ...}} in the nrepl-client-atom
+   and automatically creates the model if configured.
+   
+   Args:
+   - nrepl-client-atom: Required nREPL client atom
+   - model: Optional pre-built langchain model to use instead of auto-detection or config"
+  ([nrepl-client-atom]
+   (create-code-critique-tool nrepl-client-atom nil))
+  ([nrepl-client-atom model]
+   (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
+         ;; Get tool-specific config
+         tool-config (config/get-tool-config @nrepl-client-atom :code_critique)
+
+         ;; Get improvement count from config or default to 2
+         improvement-count (or (:improvement-count tool-config) 2)
+
+         ;; Get context from tool config
+         context-config (:context tool-config)
+
+         ;; Get system message from tool config or fall back to default
+         system-message (or (:system-message tool-config)
+                            (format-system-message improvement-count))
+
+         ;; Get description from tool config or fall back to default
+         description (or (:description tool-config)
+                         code-critique-description)
+
+         ;; Check for tool-specific config if no model provided
+         final-model (or model
+                         ;; Try to get model from config
+                         (model/get-tool-model @nrepl-client-atom :code_critique)
+                         ;; default to reasoning model
+                         (some-> (chain/reasoning-agent-model)
+                                 (.build)))]
+     {:tool-type :code-critique
+      :nrepl-client-atom nrepl-client-atom
+      :model final-model
+      :system-message system-message
+      :description description
+      :context (when context-config
+                 (general-agent/build-context-strings nrepl-client-atom working-directory context-config))
+      :working-directory working-directory
+      :context-config context-config
+      :improvement-count improvement-count})))
+
+;; Implement the required multimethods for the code critique tool
+(defmethod tool-system/tool-name :code-critique [_]
+  "code_critique")
+
+(defmethod tool-system/tool-description :code-critique [tool]
+  (or (:description tool) code-critique-description))
+
+;; TODO file-path and optional symbol 
+(defmethod tool-system/tool-schema :code-critique [_]
+  {:type :object
+   :properties {:code {:type :string
+                       :description "The Clojure code to analyze and critique"}
+                :context {:type :string
+                          :description "Optional context from previous conversation or system state"}}
+   :required [:code]})
+
+(defmethod tool-system/validate-inputs :code-critique [_ inputs]
+  (validate-code-critique-inputs inputs))
+
+(defmethod tool-system/execute-tool :code-critique [tool {:keys [code context]}]
+  (let [{:keys [nrepl-client-atom model system-message
+                working-directory context-config]} tool
+        ;; Try to get cached agent or create new one
+        cache-key ::code-critique-service
+        cached-agent (get @nrepl-client-atom cache-key)
+        agent (or cached-agent
+                  (let [new-agent (general-agent/create-general-agent
+                                   {:system-prompt system-message
+                                    :context (:context tool)
+                                    :tools [] ; Code critique doesn't need tools
+                                    :model model
+                                    :memory-size 35})] ; Smaller memory for focused critique
+                    ;; Cache the agent
+                    (swap! nrepl-client-atom assoc cache-key new-agent)
+                    new-agent))]
+
+    ;; Update context if config changed
+    (when (and cached-agent context-config)
+      (let [fresh-context (general-agent/build-context-strings nrepl-client-atom working-directory context-config)]
+        (when (not= (:context tool) fresh-context)
+          (general-agent/update-agent-context agent fresh-context))))
+
+    ;; Chat with the agent, including the optional context parameter
+    (let [message (cond-> code
+                    (not (string/blank? context))
+                    (str "\n\n```context\n" context "\n```\n"))
+          result (general-agent/chat-with-agent agent message)]
+      ;; Return in the expected format for code critique
+      {:critique (:result result)
+       :error (:error result)})))
 
 (defmethod tool-system/format-results :code-critique [_ {:keys [critique error]}]
   {:result [critique] :error error})
@@ -150,46 +204,3 @@
    (code-critique-tool nrepl-client-atom nil))
   ([nrepl-client-atom {:keys [model]}]
    (tool-system/registration-map (create-code-critique-tool nrepl-client-atom model))))
-
-(comment
-  ;; === Examples of using the code critique tool ===
-
-  ;; Setup for REPL-based testing
-  (require '[clojure-mcp.nrepl :as nrepl])
-  (def client-atom (atom (nrepl/create {:port 7888})))
-  (nrepl/start-polling @client-atom)
-
-  ;; Create a tool instance
-  (def critique-tool (create-code-critique-tool client-atom))
-
-  ;; Test the individual multimethod steps
-  (def inputs {:code "(defn add [x y] (+ x y))"})
-  (def validated (tool-system/validate-inputs critique-tool inputs))
-  (def result (tool-system/execute-tool critique-tool validated))
-  (def formatted (tool-system/format-results critique-tool result))
-
-  ;; Generate the full registration map
-  (def reg-map (tool-system/registration-map critique-tool))
-
-  ;; Test running the tool-fn directly
-  (def tool-fn (:tool-fn reg-map))
-  (tool-fn nil {"code" "(defn add [x y] (+ x y))"}
-           (fn [result error] (println "Result:" result "Error:" error)))
-  (tool-fn nil {"code" ""}
-           (fn [result error] (println "Result:" result "Error:" error)))
-
-  ;; Make a simpler test function that works like tool-fn
-  (defn test-tool [code]
-    (let [prom (promise)]
-      (tool-fn nil {"code" code}
-               (fn [result error]
-                 (deliver prom (if error {:error error} {:result result}))))
-      @prom))
-
-  ;; Test with various code samples
-  (test-tool "(defn add [x y] (+ x y))")
-  (test-tool "(let [x 1 y 2] (+ x y))")
-  (test-tool "") ;; Should trigger error handling
-
-  ;; Clean up
-  (nrepl/stop-polling @client-atom))

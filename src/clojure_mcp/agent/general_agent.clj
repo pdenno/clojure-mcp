@@ -97,7 +97,7 @@ Please use it to inform you as to which files should be investigated.\n=========
    
    Returns: The memory object (possibly reset)"
   [memory context memory-size]
-  (if (> (count (.messages memory)) (- memory-size 50))
+  (if (> (count (.messages memory)) (- memory-size 15))
     (let [cleared-memory (doto memory (.clear))]
       (initialize-memory-with-context! cleared-memory context))
     memory))

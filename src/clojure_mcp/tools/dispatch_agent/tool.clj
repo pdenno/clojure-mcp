@@ -10,6 +10,10 @@
   "The system message for the dispatch agent, loaded from resources"
   (slurp (io/resource "clojure_mcp/tools/dispatch_agent/system_message.md")))
 
+(def dispatch-agent-description
+  "The default description for the dispatch agent, loaded from resources"
+  (slurp (io/resource "clojure_mcp/tools/dispatch_agent/description.md")))
+
 (defn validate-dispatch-agent-inputs
   "Validates inputs for the dispatch-agent function"
   [inputs]
@@ -40,7 +44,21 @@
    (create-dispatch-agent-tool nrepl-client-atom nil))
   ([nrepl-client-atom model]
    (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
-         context-config (config/get-dispatch-agent-context @nrepl-client-atom)
+         ;; Get tool-specific config
+         tool-config (config/get-tool-config @nrepl-client-atom :dispatch_agent)
+
+         ;; Get context from tool config or fall back to legacy config
+         context-config (or (:context tool-config)
+                            (config/get-dispatch-agent-context @nrepl-client-atom))
+
+         ;; Get system message from tool config or fall back to default
+         system-message (or (:system-message tool-config)
+                            dispatch-agent-system-message)
+
+         ;; Get description from tool config or fall back to default
+         description (or (:description tool-config)
+                         dispatch-agent-description)
+
          ;; Check for tool-specific config if no model provided
          final-model (or model
                          ;; Try to get model from config
@@ -51,7 +69,8 @@
      {:tool-type :dispatch-agent
       :nrepl-client-atom nrepl-client-atom
       :model final-model
-      :system-message dispatch-agent-system-message
+      :system-message system-message
+      :description description
       :context (general-agent/build-context-strings nrepl-client-atom working-directory context-config)
       :tools (general-agent/build-read-only-tools nrepl-client-atom)
       :working-directory working-directory
@@ -92,18 +111,8 @@
 (defmethod tool-system/tool-name :dispatch-agent [_]
   "dispatch_agent")
 
-(defmethod tool-system/tool-description :dispatch-agent [_]
-  "Launch a new agent that has access to read-only tools. When you are searching for a keyword or file and are not confident that you will find the right match on the first try, use the Agent tool to perform the search for you. For example:
-
-- If you are searching for a keyword like \"config\" or \"logger\", the Agent tool is appropriate
-- If you want to read a specific file path, use the read_file or glob_files tool instead of the Agent tool, to find the match more quickly
-- If you are searching for a specific class definition like \"class Foo\", use the glob_files tool instead, to find the match more quickly
-
-Usage notes:
-1. Launch multiple agents concurrently whenever possible, to maximize performance; to do that, use a single message with multiple `agent` tool uses
-2. When the agent is done, it will return a single message back to you. The result returned by the agent is not visible to the user. To show the user the result, you should send a text message back to the user with a concise summary of the result.
-3. Each agent invocation is stateless. You will not be able to send additional messages to the agent, nor will the agent be able to communicate with you outside of its final report. Therefore, your prompt should contain a highly detailed task description for the agent to perform autonomously and you should specify exactly what information the agent should return back to you in its final and only message to you.
-4. The agent's outputs should generally be trusted")
+(defmethod tool-system/tool-description :dispatch-agent [tool]
+  (or (:description tool) dispatch-agent-description))
 
 (defmethod tool-system/tool-schema :dispatch-agent [_]
   {:type :object
