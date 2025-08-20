@@ -27,7 +27,8 @@
 (def agent-tool-syms
   "Symbols for agent tool creation functions (require API keys)"
   ['clojure-mcp.tools.dispatch-agent.tool/dispatch-agent-tool
-   'clojure-mcp.tools.architect.tool/architect-tool])
+   'clojure-mcp.tools.architect.tool/architect-tool
+   'clojure-mcp.tools.agent-tool-builder.tool/create-agent-tools])
 
 (def experimental-tool-syms
   "Symbols for experimental tool creation functions"
@@ -71,10 +72,15 @@
 
 (defn build-all-tools
   "Builds and returns all available tools including read-only, eval, editing, and agent tools.
-   Note: Agent tools require API keys to be configured."
+   Note: Agent tools require API keys to be configured.
+   Some tool builders may return multiple tools (e.g., agent-tool-builder)."
   [nrepl-client-atom]
   (let [tool-fns (resolve-tool-fns all-tool-syms)]
-    (mapv #(% nrepl-client-atom) tool-fns)))
+    (vec (flatten (map (fn [f]
+                         (let [result (f nrepl-client-atom)]
+                           ;; Handle both single tools and vectors of tools
+                           (if (vector? result) result [result])))
+                       tool-fns)))))
 
 ;; Category-specific builders for fine-grained control
 (defn build-eval-tools
@@ -90,10 +96,15 @@
     (mapv #(% nrepl-client-atom) tool-fns)))
 
 (defn build-agent-tools
-  "Build just the agent tools (require API keys)"
+  "Build just the agent tools (require API keys).
+   Some agent tool builders may return multiple tools (e.g., agent-tool-builder)."
   [nrepl-client-atom]
   (let [tool-fns (resolve-tool-fns agent-tool-syms)]
-    (mapv #(% nrepl-client-atom) tool-fns)))
+    (vec (flatten (map (fn [f]
+                         (let [result (f nrepl-client-atom)]
+                           ;; Handle both single tools and vectors of tools
+                           (if (vector? result) result [result])))
+                       tool-fns)))))
 
 (defn build-experimental-tools
   "Build just the experimental tools"
@@ -111,3 +122,49 @@
   [nrepl-client-atom tool-syms]
   (let [tool-fns (resolve-tool-fns tool-syms)]
     (mapv #(% nrepl-client-atom) tool-fns)))
+
+(defn filter-tools
+  "Filters tools based on enable/disable lists.
+   
+   Args:
+   - all-tools: Vector of all available tools
+   - enable-tools: Can be:
+                   - nil: returns empty vector (no tools)
+                   - :all: returns all tools (minus disabled)
+                   - [...]: returns only specified tools (minus disabled)
+   - disable-tools: List of tool IDs to disable
+   
+   Returns: Filtered vector of tools"
+  [all-tools enable-tools disable-tools]
+  (cond
+    ;; nil means no tools
+    (nil? enable-tools)
+    []
+
+    ;; :all means all tools (minus disabled)
+    (= enable-tools :all)
+    (let [disable-set (when disable-tools
+                        (set (map keyword disable-tools)))
+          get-tool-id (fn [tool]
+                        (or (:tool-type tool)
+                            (keyword (:name tool))))]
+      (filterv
+       (fn [tool]
+         (let [tool-id (get-tool-id tool)]
+           (not (contains? disable-set tool-id))))
+       all-tools))
+
+    ;; Otherwise it's a list of specific tools
+    :else
+    (let [enable-set (set (map keyword enable-tools))
+          disable-set (when disable-tools
+                        (set (map keyword disable-tools)))
+          get-tool-id (fn [tool]
+                        (or (:tool-type tool)
+                            (keyword (:name tool))))]
+      (filterv
+       (fn [tool]
+         (let [tool-id (get-tool-id tool)]
+           (and (contains? enable-set tool-id)
+                (not (contains? disable-set tool-id)))))
+       all-tools))))

@@ -170,8 +170,27 @@
   [nrepl-client-map tool-id]
   (let [tools-config (get-tools-config nrepl-client-map)
         ;; Normalize tool-id to keyword
-        tool-key (if (string? tool-id) (keyword tool-id) tool-id)]
+        tool-key (keyword tool-id)]
     (get tools-config tool-key)))
+
+(defn get-agents-config
+  "Returns the agents configuration vector.
+   Defaults to empty vector when not specified."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :agents)]
+    (if (nil? value)
+      []
+      value)))
+
+(defn get-agent-config
+  "Returns configuration for a specific agent by ID.
+   Agent ID can be a keyword or string.
+   Returns nil if no agent with that ID exists."
+  [nrepl-client-map agent-id]
+  (let [agents (get-agents-config nrepl-client-map)
+        ;; Normalize agent-id to keyword
+        agent-key (keyword agent-id)]
+    (first (filter #(= (:id %) agent-key) agents))))
 
 (defn get-mcp-client-hint [nrepl-client-map]
   (get-config nrepl-client-map :mcp-client))
@@ -228,7 +247,7 @@
   (let [enable-tools (get-enable-tools nrepl-client-map)
         disable-tools (get-disable-tools nrepl-client-map)
         ;; Normalize tool-id to keyword
-        tool-id (if (string? tool-id) (keyword tool-id) tool-id)
+        tool-id (keyword tool-id)
         enable-set (when enable-tools (set (map keyword enable-tools)))
         disable-set (when disable-tools (set (map keyword disable-tools)))]
     (cond

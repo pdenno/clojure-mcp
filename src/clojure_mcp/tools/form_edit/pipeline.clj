@@ -4,6 +4,7 @@
    standardized context maps."
   (:require
    [clojure-mcp.tools.form-edit.core :as core]
+   [clojure-mcp.tools.agent-tool-builder.file-changes :as file-changes]
    [clojure-mcp.utils.emacs-integration :as emacs]
    [clojure-mcp.utils.diff :as diff-utils]
    [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
@@ -575,6 +576,7 @@
      validate-form-type
      emacs-buffer-modified-check
      load-source
+     file-changes/capture-original-file-content
      check-file-modified
      enhance-defmethod-name
      parse-source
@@ -615,6 +617,7 @@
      validate-form-type
      emacs-buffer-modified-check
      load-source
+     file-changes/capture-original-file-content
      check-file-modified
      enhance-defmethod-name
      parse-source
@@ -651,6 +654,7 @@
      ctx
      emacs-buffer-modified-check
      load-source
+     file-changes/capture-original-file-content
      check-file-modified
      find-and-edit-comment
      capture-edit-offsets
@@ -742,6 +746,7 @@
      #(lint-repair-code % ::new-form)
      emacs-buffer-modified-check
      load-source
+     file-changes/capture-original-file-content
      check-file-modified
      parse-source
      replace-sexp
@@ -783,6 +788,7 @@
      #(lint-repair-code % ::new-form)
      emacs-buffer-modified-check
      load-source
+     file-changes/capture-original-file-content
      check-file-modified
      parse-source
      edit-sexp
