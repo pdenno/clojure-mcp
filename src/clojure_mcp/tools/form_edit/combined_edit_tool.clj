@@ -81,6 +81,13 @@ WARNING: you will receive errors if the syntax is wrong, the most common error i
    - operation: \"insert_after\"
    - content: \"(deftest example-fn-test\n  (is (= 4 (example-fn 2))))\"
    
+   Example: Edit a namespace declaration (form_identifier is the namespace name):
+   - file_path: \"/path/to/file.clj\"
+   - form_identifier: \"my.app.core\"
+   - form_type: \"ns\"
+   - operation: \"replace\"
+   - content: \"(ns my.app.core\n  (:require [clojure.string :as str]\n            [clojure.java.io :as io]))\"
+   
 Note: For `defmethod` forms, be sure to include the dispatch value (`area :rectangle` or `qualified/area :rectangle`) in the `form_identifier`. Many `defmethod` definitions have qualified names (they include a namespace alias in their identifier like `shape/area`), so it's crucial to use the complete identifier that appears in the file.
 
    Example: Replace a specific `defmethod` implementation:
