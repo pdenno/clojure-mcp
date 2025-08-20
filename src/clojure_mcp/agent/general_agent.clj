@@ -6,7 +6,8 @@
             [clojure.java.io :as io]
             [clojure-mcp.agent.langchain :as chain]
             [clojure-mcp.config :as config]
-            [clojure-mcp.tools.project.core :as project-core])
+            [clojure-mcp.tools.project.core :as project-core]
+            [clojure-mcp.tools :as tools])
   (:import
    [clojure_mcp.agent.langchain AiService]
    [dev.langchain4j.data.message UserMessage TextContent]))
@@ -22,9 +23,7 @@
    
    Returns: A vector of read-only tools"
   [nrepl-client-atom]
-  ;; Runtime require to avoid cyclic dependency
-  (require '[clojure-mcp.tools :as tools])
-  ((resolve 'clojure-mcp.tools/build-read-only-tools) nrepl-client-atom))
+  (tools/build-read-only-tools nrepl-client-atom))
 
 (defn build-context-strings
   "Build context strings based on the context configuration.

@@ -368,20 +368,22 @@ Viewing tasks:
                                                  [(:error-details data)])))]
                       (callback error-msgs true))))))})
 
-(defn create-scratch-pad-tool [nrepl-client-atom working-directory]
-  {:tool-type :scratch-pad
-   :nrepl-client-atom nrepl-client-atom
-   :working-directory working-directory})
+(defn create-scratch-pad-tool
+  [nrepl-client-atom]
+  (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)]
+    {:tool-type :scratch-pad
+     :nrepl-client-atom nrepl-client-atom
+     :working-directory working-directory}))
 
 (defn scratch-pad-tool
   "Returns the registration map for the scratch pad tool.
    
    Parameters:
-   - nrepl-client-atom: Atom containing the nREPL client
-   - working-directory: The working directory for file persistence"
-  [nrepl-client-atom working-directory]
-  ;; Check if persistence is enabled via config
-  (let [load? (config/get-scratch-pad-load @nrepl-client-atom)
+   - nrepl-client-atom: Atom containing the nREPL client"
+  [nrepl-client-atom]
+  ;; Get working directory from config
+  (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
+        load? (config/get-scratch-pad-load @nrepl-client-atom)
         filename (config/get-scratch-pad-file @nrepl-client-atom)]
     ;; persist by default
     ;; load by config
@@ -392,4 +394,4 @@ Viewing tasks:
           (swap! nrepl-client-atom assoc ::scratch-pad existing-data)
           (save-scratch-pad! working-directory filename {} nrepl-client-atom)))))
 
-  (tool-system/registration-map (create-scratch-pad-tool nrepl-client-atom working-directory)))
+  (tool-system/registration-map (create-scratch-pad-tool nrepl-client-atom)))

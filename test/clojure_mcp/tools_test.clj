@@ -19,8 +19,7 @@
 (deftest test-build-all-tools
   (testing "All tools are created correctly"
     (let [nrepl-client-atom (atom {})
-          working-dir "/test/dir"
-          all-tools (tools/build-all-tools nrepl-client-atom working-dir)]
+          all-tools (tools/build-all-tools nrepl-client-atom)]
       (is (vector? all-tools))
       (is (pos? (count all-tools)))
       ;; All tools should be a superset of read-only tools

@@ -9,23 +9,7 @@
             [clojure-mcp.tools.project.core :as project]
             [clojure-mcp.resources :as resources]
             [clojure-mcp.config :as config]
-            ;; tools
-            [clojure-mcp.tools.directory-tree.tool :as directory-tree-tool]
-            [clojure-mcp.tools.eval.tool :as eval-tool]
-            [clojure-mcp.tools.unified-read-file.tool :as unified-read-file-tool]
-            [clojure-mcp.tools.grep.tool :as new-grep-tool]
-            [clojure-mcp.tools.glob-files.tool :as glob-files-tool]
-            [clojure-mcp.tools.think.tool :as think-tool]
-            [clojure-mcp.tools.bash.tool :as bash-tool]
-            [clojure-mcp.tools.form-edit.combined-edit-tool :as combined-edit-tool]
-            [clojure-mcp.tools.form-edit.tool :as new-form-edit-tool]
-            [clojure-mcp.tools.file-edit.tool :as file-edit-tool]
-            [clojure-mcp.tools.file-write.tool :as file-write-tool]
-            [clojure-mcp.tools.dispatch-agent.tool :as dispatch-agent-tool]
-            [clojure-mcp.tools.architect.tool :as architect-tool]
-            [clojure-mcp.tools.code-critique.tool :as code-critique-tool]
-            [clojure-mcp.tools.project.tool :as project-tool]
-            [clojure-mcp.tools.scratch-pad.tool :as scratch-pad-tool]))
+            [clojure-mcp.tools :as tools]))
 
 ;; Define the resources you want available
 (defn make-resources [nrepl-client-atom working-dir]
@@ -82,37 +66,9 @@
    (prompts/scratch-pad-save-as nrepl-client-atom)])
 
 (defn make-tools [nrepl-client-atom working-directory]
-  [;; read-only tools
-   (directory-tree-tool/directory-tree-tool nrepl-client-atom)
-   (unified-read-file-tool/unified-read-file-tool nrepl-client-atom)
-   (new-grep-tool/grep-tool nrepl-client-atom)
-   (glob-files-tool/glob-files-tool nrepl-client-atom)
-   (think-tool/think-tool nrepl-client-atom)
-   ;; experimental todo list / scratch pad
-   (scratch-pad-tool/scratch-pad-tool nrepl-client-atom working-directory)
-
-   ;; eval
-   (eval-tool/eval-code nrepl-client-atom)
-   ;; now runs in the nrepl process
-   (bash-tool/bash-tool nrepl-client-atom)
-
-   ;; editing tools
-   (combined-edit-tool/unified-form-edit-tool nrepl-client-atom)
-   (new-form-edit-tool/sexp-update-tool nrepl-client-atom)
-   (file-edit-tool/file-edit-tool nrepl-client-atom)
-   (file-write-tool/file-write-tool nrepl-client-atom)
-
-   ;; introspection
-   (project-tool/inspect-project-tool nrepl-client-atom)
-
-   ;; Agents these are read only
-   ;; these require api keys to be configured
-   (dispatch-agent-tool/dispatch-agent-tool nrepl-client-atom)
-   ;; not sure how useful this is
-   (architect-tool/architect-tool nrepl-client-atom)
-
-   ;; experimental 
-   (code-critique-tool/code-critique-tool nrepl-client-atom)])
+  ;; Use the refactored tools builder
+  ;; Note: working-directory param kept for compatibility with core API but unused
+  (tools/build-all-tools nrepl-client-atom))
 
 ;; DEPRECATED but maintained for backward compatability
 (defn ^:deprecated my-prompts
@@ -125,8 +81,7 @@
   (make-resources nrepl-client-atom working-dir))
 
 (defn ^:deprecated my-tools [nrepl-client-atom]
-  (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)]
-    (make-tools nrepl-client-atom working-directory)))
+  (tools/build-all-tools nrepl-client-atom))
 
 (defn start-mcp-server [opts]
   (core/build-and-start-mcp-server
