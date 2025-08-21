@@ -27,10 +27,13 @@
   (let [{:keys [id name description system-message context
                 model enable-tools disable-tools memory-size]} agent-config
 
+        ;; Prepare isolated atom for agent tools
+        agent-atom (general-agent/prep-agent-system-atom nrepl-client-atom)
+
         working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
 
-        ;; Get ALL available tools (not just read-only)
-        all-available-tools (tools/build-all-tools nrepl-client-atom)
+        ;; Build tools with isolated atom
+        all-available-tools (tools/build-all-tools agent-atom)
 
         ;; Handle tool filtering - filter-tools now properly handles nil, :all, and lists
         filtered-tools (if (and (sequential? enable-tools)
@@ -40,11 +43,11 @@
                          ;; Otherwise let filter-tools handle it (nil returns [], list returns filtered)
                          (tools/filter-tools all-available-tools enable-tools disable-tools))
 
-        ;; Build context strings based on config
+        ;; Build context strings based on config using original atom for config access
         context-strings (general-agent/build-context-strings
                          nrepl-client-atom working-directory context)
 
-        ;; Get or create model
+        ;; Get or create model using original atom for config
         final-model (cond
                       ;; If model is already a built object
                       (and model (not (keyword? model)) (not (string? model)))

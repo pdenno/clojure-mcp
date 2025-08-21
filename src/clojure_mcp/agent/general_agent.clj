@@ -72,6 +72,23 @@ Please use it to inform you as to which files should be investigated.\n=========
     :else
     []))
 
+(defn prep-agent-system-atom
+  "Prepares an nrepl-client-atom for agent use by:
+   - Removing :mcp-client-hint to isolate from main conversation
+   - Creating a fresh ::file-timestamps atom for isolated file tracking
+   
+   Args:
+   - nrepl-client-atom: The original nREPL client atom
+   
+   Returns: A new atom with isolated configuration for agent use"
+  [nrepl-client-atom]
+  (let [original-state @nrepl-client-atom
+        ;; Remove MCP client hint and file timestamps
+        prepped-state (-> original-state
+                          (dissoc :mcp-client-hint)
+                          (dissoc :clojure-mcp.tools.unified-read-file.file-timestamps/file-timestamps))]
+    (atom prepped-state)))
+
 (defn create-memory-for-config
   "Creates memory based on configuration.
    nil/false/< 10 = stateless with 100 message buffer

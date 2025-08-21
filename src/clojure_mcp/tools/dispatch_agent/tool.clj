@@ -127,10 +127,16 @@
   (let [{:keys [nrepl-client-atom model system-message context
                 tools working-directory context-config]} tool
 
+        ;; Prepare isolated atom for dispatch agent
+        agent-atom (general-agent/prep-agent-system-atom nrepl-client-atom)
+
         ;; Get dispatch agent's own configuration
         tool-config (config/get-tool-config @nrepl-client-atom :dispatch_agent)
         ;; Default to 100 (persistent) for dispatch_agent
         memory-size (or (:memory-size tool-config) 100)
+
+        ;; Build tools with isolated atom
+        isolated-tools (general-agent/build-read-only-tools agent-atom)
 
         ;; Try to get cached agent or create new one
         cache-key ::dispatch-agent-service
@@ -139,7 +145,7 @@
                   (let [new-agent (general-agent/create-general-agent
                                    {:system-prompt system-message
                                     :context context
-                                    :tools tools
+                                    :tools isolated-tools ;; Use isolated tools
                                     :model model
                                     :memory-size memory-size})]
                     ;; Cache the agent

@@ -158,6 +158,13 @@
 (defmethod tool-system/execute-tool :architect [tool {:keys [prompt context]}]
   (let [{:keys [nrepl-client-atom model system-message
                 tools working-directory context-config]} tool
+
+        ;; Prepare isolated atom for architect agent
+        agent-atom (general-agent/prep-agent-system-atom nrepl-client-atom)
+
+        ;; Build tools with isolated atom
+        isolated-tools (build-architect-tools agent-atom)
+
         ;; Try to get cached agent or create new one
         cache-key ::architect-service
         cached-agent (get @nrepl-client-atom cache-key)
@@ -165,7 +172,7 @@
                   (let [new-agent (general-agent/create-general-agent
                                    {:system-prompt system-message
                                     :context (:context tool)
-                                    :tools tools
+                                    :tools isolated-tools ;; Use isolated tools
                                     :model model
                                     :memory-size general-agent/DEFAULT-MEMORY-SIZE})]
                     ;; Cache the agent
