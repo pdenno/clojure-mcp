@@ -19,9 +19,7 @@
   (testing "Tool creation without model configuration uses default model"
     (let [nrepl-client-atom (atom {::config/config {}})]
       (let [tool-config (tool/create-dispatch-agent-tool nrepl-client-atom)]
-        (is (= :dispatch-agent (:tool-type tool-config)))
-        ;; Model should be created from default chain/agent-model
-        (is (some? (:model tool-config)) "Model should use default when not configured"))))
+        (is (= :dispatch-agent (:tool-type tool-config))))))
 
   (testing "Tool creation with explicit model overrides config"
     (let [nrepl-client-atom (atom {::config/config

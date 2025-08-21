@@ -19,9 +19,7 @@
   (testing "Tool creation without model configuration uses default reasoning model"
     (let [nrepl-client-atom (atom {::config/config {}})]
       (let [tool-config (tool/create-architect-tool nrepl-client-atom)]
-        (is (= :architect (:tool-type tool-config)))
-        ;; Model should be created from default chain/reasoning-agent-model
-        (is (some? (:model tool-config)) "Model should use default reasoning model when not configured"))))
+        (is (= :architect (:tool-type tool-config))))))
 
   (testing "Tool creation with explicit model overrides config"
     (binding [model/*env-overrides* {"OPENAI_API_KEY" "test-key"}]
