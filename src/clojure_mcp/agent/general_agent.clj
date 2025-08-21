@@ -12,7 +12,9 @@
    [clojure_mcp.agent.langchain AiService]
    [dev.langchain4j.data.message UserMessage TextContent]))
 
-(def DEFAULT-MEMORY-SIZE 300)
+(def DEFAULT-MEMORY-SIZE 100)
+(def DEFAULT-STATELESS-BUFFER 100)
+(def MIN-PERSISTENT-WINDOW 10)
 
 (defn build-read-only-tools
   "Builds the read-only tools for agents.
@@ -70,6 +72,33 @@ Please use it to inform you as to which files should be investigated.\n=========
     :else
     []))
 
+(defn create-memory-for-config
+  "Creates memory based on configuration.
+   nil/false/< 10 = stateless with 100 message buffer
+   number >= 10 = persistent sliding window of that size"
+  [memory-size]
+  (cond
+    ;; Stateless mode (default)
+    (or (nil? memory-size)
+        (false? memory-size))
+    {:memory (chain/chat-memory DEFAULT-STATELESS-BUFFER)
+     :stateless? true}
+
+    ;; Number less than 10 - treat as stateless
+    (and (number? memory-size)
+         (< memory-size MIN-PERSISTENT-WINDOW))
+    {:memory (chain/chat-memory DEFAULT-STATELESS-BUFFER)
+     :stateless? true}
+
+    ;; Persistent sliding window mode (10 or greater)
+    (number? memory-size)
+    {:memory (chain/chat-memory memory-size)
+     :stateless? false}
+
+    :else
+    (throw (ex-info "Invalid memory-size value"
+                    {:value memory-size}))))
+
 (defn initialize-memory-with-context!
   "Initialize memory with the provided context strings.
    
@@ -111,16 +140,17 @@ Please use it to inform you as to which files should be investigated.\n=========
      :tools - A vector of tools the agent can use
      :memory - A langchain memory object (optional, creates one if not provided)
      :model - A langchain model object
-     :memory-size - Maximum memory size before reset (optional, defaults to 300)
+     :memory-size - Memory configuration (nil/false/<10 = stateless, >=10 = persistent window)
    
    Returns: A map containing:
      :service - The built AI service
      :memory - The memory object
      :model - The model object
      :tools - The tools vector
-     :system-message - The system prompt"
-  [{:keys [system-prompt context tools memory model memory-size]
-    :or {memory-size DEFAULT-MEMORY-SIZE}}]
+     :system-message - The system prompt
+     :stateless? - Whether memory clears on each chat
+     :memory-size - The configured memory size (for reset logic)"
+  [{:keys [system-prompt context tools memory model memory-size]}]
   (try
     (when-not model
       (throw (ex-info "Model is required" {:missing :model})))
@@ -128,10 +158,15 @@ Please use it to inform you as to which files should be investigated.\n=========
     (when-not system-prompt
       (throw (ex-info "System prompt is required" {:missing :system-prompt})))
 
-    (let [agent-memory (or memory (chain/chat-memory memory-size))
-          initialized-memory (if context
-                               (initialize-memory-with-context! agent-memory context)
-                               agent-memory)
+    (let [;; Use new memory-size logic
+          {:keys [memory stateless?] :as memory-config} (create-memory-for-config memory-size)
+          ;; Get the actual memory size for reset logic
+          actual-memory-size (if stateless?
+                               DEFAULT-STATELESS-BUFFER
+                               memory-size)
+          initialized-memory (if (and context (not stateless?))
+                               (initialize-memory-with-context! memory context)
+                               memory)
           ai-service-data {:memory initialized-memory
                            :model model
                            :tools (or tools [])
@@ -140,7 +175,8 @@ Please use it to inform you as to which files should be investigated.\n=========
                       (.build))]
       (assoc ai-service-data
              :service service
-             :memory-size memory-size
+             :stateless? stateless?
+             :memory-size actual-memory-size
              :context context))
     (catch Exception e
       (log/error e "Failed to create general agent service")
@@ -159,10 +195,19 @@ Please use it to inform you as to which files should be investigated.\n=========
     {:result "Error: Cannot process empty prompt"
      :error true}
     (try
-      ;; Reset memory if needed before each chat
-      (reset-memory-if-needed! (:memory agent)
-                               (:context agent)
-                               (:memory-size agent))
+      ;; Clear memory for stateless agents at start of each chat
+      (when (:stateless? agent)
+        (.clear (:memory agent))
+        (when (:context agent)
+          (initialize-memory-with-context! (:memory agent) (:context agent))))
+
+      ;; For persistent agents, use reset logic to prevent invalid chats
+      ;; Reset when approaching memory limit to maintain conversation coherence
+      (when-not (:stateless? agent)
+        (reset-memory-if-needed! (:memory agent)
+                                 (:context agent)
+                                 (:memory-size agent)))
+
       (let [result (.chat (:service agent) prompt)]
         {:result result
          :error false})

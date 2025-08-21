@@ -126,6 +126,12 @@
 (defmethod tool-system/execute-tool :dispatch-agent [tool {:keys [prompt]}]
   (let [{:keys [nrepl-client-atom model system-message context
                 tools working-directory context-config]} tool
+
+        ;; Get dispatch agent's own configuration
+        tool-config (config/get-tool-config @nrepl-client-atom :dispatch_agent)
+        ;; Default to 100 (persistent) for dispatch_agent
+        memory-size (or (:memory-size tool-config) 100)
+
         ;; Try to get cached agent or create new one
         cache-key ::dispatch-agent-service
         cached-agent (get @nrepl-client-atom cache-key)
@@ -135,7 +141,7 @@
                                     :context context
                                     :tools tools
                                     :model model
-                                    :memory-size general-agent/DEFAULT-MEMORY-SIZE})]
+                                    :memory-size memory-size})]
                     ;; Cache the agent
                     (swap! nrepl-client-atom assoc cache-key new-agent)
                     new-agent))]

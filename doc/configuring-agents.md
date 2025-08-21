@@ -62,6 +62,9 @@ Each agent configuration supports the following keys:
   - `[:all]` - All available tools
   - `[:tool1 :tool2]` - Specific tools only
 - **`:disable-tools`** - List of tool IDs to disable (applied after enable-tools)
+- **`:memory-size`** - Controls conversation memory behavior:
+  - `nil`, `false`, or `< 10` - **Stateless** (default): Clears memory on each chat
+  - `>= 10` - **Persistent**: Accumulates messages up to limit, then resets completely
 
 ## Available Tools for Agents
 
@@ -169,9 +172,10 @@ Here's a comprehensive configuration with agents of varying capability levels:
                            your knowledge without accessing files or running code."
            :context false
            ;; No :enable-tools means no tools
+           ;; No :memory-size means stateless (default)
           }
           
-          ;; Read-only research agent
+          ;; Read-only research agent - stateless
           {:id :research-agent
            :name "research_agent"
            :description "Researches code patterns and finds examples"
@@ -179,16 +183,18 @@ Here's a comprehensive configuration with agents of varying capability levels:
                            and analyze structure. Be thorough and provide specific locations."
            :model :anthropic/fast
            :context true
+           :memory-size false  ; Explicitly stateless
            :enable-tools [:grep :glob-files :read-file :clojure-inspect-project]
            :disable-tools nil}
           
-          ;; Documentation specialist
+          ;; Documentation specialist - stateless
           {:id :doc-reader
            :name "doc_reader"
            :description "Reads and summarizes documentation"
            :system-message "You are a documentation specialist. Summarize clearly 
                            and focus on practical usage."
            :context ["README.md" "doc/"]
+           :memory-size nil  ; Stateless (same as omitting)
            :enable-tools [:read-file :glob-files]}
           
           ;; Test runner - can execute but not modify
@@ -198,10 +204,11 @@ Here's a comprehensive configuration with agents of varying capability levels:
            :system-message "You run tests and analyze results. You can execute code 
                            but cannot modify files."
            :context ["test/"]
+           :memory-size 5  ; < 10 = stateless
            :enable-tools [:read-file :grep :glob-files :clojure-eval :bash]
            :disable-tools [:file-write :file-edit :clojure-edit]}
           
-          ;; Code writer - can modify code
+          ;; Code writer - persistent memory for multi-step refactoring
           {:id :code-writer
            :name "code_writer"
            :description "Writes and modifies code files"
@@ -210,12 +217,13 @@ Here's a comprehensive configuration with agents of varying capability levels:
                            Explain changes clearly."
            :model :openai/smart
            :context true
+           :memory-size 50  ; Persistent - remembers recent edits
            :enable-tools [:read-file :grep :glob-files 
                           :clojure-eval :bash
                           :file-write :file-edit 
                           :clojure-edit :clojure-edit-replace-sexp]}
           
-          ;; Full access agent - use with extreme caution
+          ;; Full access agent with large memory
           {:id :admin-agent
            :name "admin_agent"
            :description "Full system access - use with extreme caution"
@@ -223,6 +231,7 @@ Here's a comprehensive configuration with agents of varying capability levels:
                            operations. Explain risks before taking actions. Never delete 
                            or overwrite without explicit confirmation."
            :context true
+           :memory-size 200  ; Large persistent memory for complex operations
            :enable-tools [:all]  ; Access to everything
            :disable-tools nil}]}
 ```
@@ -320,6 +329,144 @@ Agents can use custom models defined in the `:models` configuration:
            }]}
 ```
 
+## Memory Configuration
+
+The `:memory-size` field controls how agents handle conversation memory between invocations. Unlike a sliding window that continuously drops old messages, persistent agents accumulate messages until approaching their limit, then completely reset.
+
+### Memory Modes
+
+| Configuration | Mode | Behavior |
+|--------------|------|----------|
+| `nil` (default) | **Stateless** | Clears memory before each chat, starts fresh |
+| `false` | **Stateless** | Explicitly stateless, same as `nil` |
+| `< 10` | **Stateless** | Numbers less than 10 treated as stateless |
+| `>= 10` | **Persistent** | Accumulates messages up to limit, then resets |
+
+### Stateless Mode (Default)
+
+Stateless agents clear their memory at the start of each chat but maintain a 100-message buffer during the conversation:
+
+```clojure
+{:id :task-agent
+ :name "task_agent"
+ ;; No memory-size specified = stateless (default)
+ :description "Performs independent tasks"
+ :system-message "You complete tasks independently..."}
+
+{:id :analyzer
+ :name "analyzer"  
+ :memory-size false  ; Explicitly stateless
+ :description "Analyzes code without conversation history"
+ :system-message "You analyze code..."}
+```
+
+**Benefits of Stateless:**
+- Predictable behavior - each invocation starts fresh
+- No context pollution from previous tasks
+- Ideal for single-purpose operations
+- Still supports complex multi-turn conversations (100-message buffer)
+
+### Persistent Mode
+
+Persistent agents maintain conversation history across invocations, accumulating messages until approaching the configured limit:
+
+```clojure
+{:id :assistant
+ :name "assistant"
+ :memory-size 50  ; Accumulates up to ~35 messages, then resets
+ :description "Conversational assistant with memory"
+ :system-message "You are a helpful assistant..."}
+
+{:id :tutor
+ :name "tutor"
+ :memory-size 100  ; Accumulates up to ~85 messages, then resets
+ :description "Educational tutor that remembers previous lessons"
+ :system-message "You are a patient tutor..."}
+```
+
+**Persistent Memory Behavior:**
+- Accumulates conversation history across multiple invocations
+- When approaching memory limit (size - 15 messages), completely resets
+- Re-adds original context after reset to maintain coherence
+- NOT a sliding window - it's a buffer that resets when nearly full
+
+### Special Case: Dispatch Agent
+
+The `dispatch_agent` tool defaults to persistent mode with a 100-message window. This can be overridden in `:tools-config`:
+
+```clojure
+{:tools-config {:dispatch_agent {:memory-size 200}}  ; Increase dispatch agent memory
+ ;; or
+ :tools-config {:dispatch_agent {:memory-size false}}} ; Make dispatch agent stateless
+```
+
+### Memory Size Examples
+
+```clojure
+{:agents [;; Stateless examples
+          {:id :code-reviewer
+           :name "code_reviewer"
+           ;; Default: no memory-size = stateless
+           :description "Reviews code independently each time"
+           :system-message "Review the provided code..."}
+          
+          {:id :test-runner
+           :name "test_runner"
+           :memory-size 5  ; < 10 = stateless
+           :description "Runs tests without history"
+           :system-message "Run and analyze test results..."}
+          
+          ;; Persistent examples
+          {:id :chat-bot
+           :name "chat_bot"
+           :memory-size 30  ; Small buffer - resets after ~15 messages
+           :description "Simple chatbot with short-term memory"
+           :system-message "You are a friendly chatbot..."}
+          
+          {:id :project-assistant
+           :name "project_assistant"
+           :memory-size 100  ; Standard buffer - resets after ~85 messages
+           :description "Project assistant with conversation memory"
+           :system-message "You help with ongoing project tasks..."}
+          
+          {:id :long-context-agent
+           :name "long_context"
+           :memory-size 300  ; Large buffer - resets after ~285 messages
+           :description "Agent for complex, long-running conversations"
+           :system-message "You handle complex multi-part tasks..."}]}
+```
+
+### Choosing the Right Memory Configuration
+
+**Use Stateless (default) when:**
+- Each task is independent
+- You want predictable, fresh behavior
+- Handling sensitive data that shouldn't persist
+- Building single-purpose tools
+- Avoiding context pollution is important
+
+**Use Persistent when:**
+- Building conversational interfaces
+- Tasks build on previous interactions
+- Maintaining context across multiple queries
+- Creating tutoring or coaching agents
+- Implementing multi-step workflows
+
+### Memory Management Details
+
+**Stateless agents:**
+- Clear memory at the start of each `chat` invocation
+- Re-initialize with configured context
+- Maintain 100-message buffer during the conversation
+- Perfect for complex single tasks with many tool calls
+
+**Persistent agents:**
+- Keep conversation history between invocations
+- Accumulate messages until approaching limit (size - 15)
+- Completely reset memory when limit approached (not a sliding window)
+- Re-add original context after reset
+- Ensures conversations remain coherent by avoiding partial memory loss
+
 ## Tool Filtering Logic
 
 - If `:enable-tools` is `nil` or omitted: **No tools enabled**
@@ -345,7 +492,10 @@ Examples:
 - Agents are cached after first creation for performance
 - The same agent instance is reused across invocations
 - Cache key is based on the agent's `:id`
-- Agents maintain conversation memory within a session
+- Memory behavior depends on `:memory-size` configuration:
+  - **Stateless agents**: Memory clears on each invocation (fresh start)
+  - **Persistent agents**: Memory persists across invocations within the session
+- Agent cache persists for the duration of the MCP server session
 
 ## Troubleshooting
 
@@ -368,6 +518,13 @@ Examples:
 - Verify tool IDs in `:enable-tools` match available tools
 - Check that tools aren't disabled in `:disable-tools`
 - Ensure the agent has the necessary tool combination (e.g., needs `:read-file` before `:clojure-edit`)
+
+### Memory Issues
+- **Agent doesn't remember previous conversation**: Check if `:memory-size` is `>= 10` for persistent memory
+- **Agent remembers unwanted context**: Set `:memory-size` to `nil`, `false`, or `< 10` for stateless behavior
+- **Conversation becomes incoherent**: Memory may be too small; increase `:memory-size` for longer conversations
+- **Agent resets mid-conversation**: This happens when memory approaches limit (size - 15); increase `:memory-size`
+- **Important**: Persistent memory is NOT a sliding window - it accumulates messages then resets completely
 
 ## Migration from Previous Versions
 

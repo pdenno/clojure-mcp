@@ -16,7 +16,7 @@
    Args:
    - nrepl-client-atom: The nREPL client atom
    - agent-config: Map with :id, :name, :description, :system-message, :context, 
-                   :model, :enable-tools, :disable-tools
+                   :model, :enable-tools, :disable-tools, :memory-size
    
    Note: If :enable-tools is not specified or is nil, the agent will have NO tools.
          Specify :enable-tools with desired tool IDs to give the agent access to tools.
@@ -25,7 +25,7 @@
    Returns: Agent service map"
   [nrepl-client-atom agent-config]
   (let [{:keys [id name description system-message context
-                model enable-tools disable-tools]} agent-config
+                model enable-tools disable-tools memory-size]} agent-config
 
         working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
 
@@ -60,14 +60,17 @@
                               (.build)))]
 
     (log/info (str "Building agent '" name "' with "
-                   (count filtered-tools) " tools"))
+                   (count filtered-tools) " tools"
+                   (if memory-size
+                     (str " and memory-size: " memory-size)
+                     " (stateless)")))
 
     (general-agent/create-general-agent
      {:system-prompt system-message
       :context context-strings
       :tools filtered-tools
       :model final-model
-      :memory-size general-agent/DEFAULT-MEMORY-SIZE})))
+      :memory-size memory-size})))
 
 (defn get-or-create-agent
   "Gets a cached agent or creates a new one.
