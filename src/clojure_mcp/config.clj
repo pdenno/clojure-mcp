@@ -332,6 +332,11 @@
   [nrepl-client-map]
   (get-config nrepl-client-map :resources))
 
+(defn get-prompts
+  "Get the prompts configuration map from config"
+  [nrepl-client-map]
+  (get-config nrepl-client-map :prompts))
+
 (defn set-config*
   "Sets a config value in a map. Returns the updated map.
    This is the core function that set-config! uses."

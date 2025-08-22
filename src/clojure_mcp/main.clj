@@ -16,22 +16,10 @@
 (defn make-resources [nrepl-client-atom working-dir]
   (resources/make-resources nrepl-client-atom))
 
+;; Delegate to prompts namespace
+;; Note: working-dir param kept for compatibility with core API but unused
 (defn make-prompts [nrepl-client-atom working-dir]
-  [{:name "clojure_repl_system_prompt"
-    :description "Provides instructions and guidelines for Clojure development, including style and best practices."
-    :arguments [] ;; No arguments needed for this prompt
-    :prompt-fn (prompts/simple-content-prompt-fn
-                "System Prompt: Clojure REPL"
-                (str
-                 (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_repl_form_edit.md")
-                 (prompts/load-prompt-from-resource "clojure-mcp/prompts/system/clojure_form_edit.md")))}
-   (prompts/create-project-summary working-dir)
-   prompts/chat-session-summary
-   prompts/resume-chat-session
-   prompts/plan-and-execute
-   (prompts/add-dir nrepl-client-atom)
-   (prompts/scratch-pad-load nrepl-client-atom)
-   (prompts/scratch-pad-save-as nrepl-client-atom)])
+  (prompts/make-prompts nrepl-client-atom))
 
 (defn make-tools [nrepl-client-atom working-directory]
   ;; Use the refactored tools builder

@@ -279,3 +279,97 @@ After doing this provide a very brief (8 lines) summary of where we are and then
                                         :content (format "Failed to save scratch pad to '%s'.\nError: %s"
                                                          (.getPath file)
                                                          (.getMessage e))}]})))))))})
+
+(defn create-prompt-from-config
+  "Creates a prompt from configuration map.
+   Config should have :description, :args, and either :file-path or :content.
+   Uses pogonos/mustache templating for the content."
+  [prompt-name {:keys [description args file-path content]} working-dir nrepl-client-atom]
+  (let [;; Prepare arguments structure for MCP
+        arguments (mapv (fn [{:keys [name description required?]}]
+                          {:name name
+                           :description description
+                           :required? (boolean required?)})
+                        args)
+        ;; Get the template content
+        template-content (cond
+                           content content
+                           file-path (let [full-path (if (.isAbsolute (io/file file-path))
+                                                       file-path
+                                                       (.getCanonicalPath (io/file working-dir file-path)))]
+                                       (when (.exists (io/file full-path))
+                                         (slurp full-path)))
+                           :else nil)]
+    (when template-content
+      {:name prompt-name
+       :description description
+       :arguments arguments
+       :prompt-fn (fn [_ request-args clj-result-k]
+                    (try
+                      ;; Convert string keys to keyword keys for pogonos
+                      (let [template-data (into {} (map (fn [[k v]] [(keyword k) v]) request-args))
+                            rendered-content (pg/render-string template-content template-data)]
+                        (clj-result-k
+                         {:description description
+                          :messages [{:role :user :content rendered-content}]}))
+                      (catch Exception e
+                        (clj-result-k
+                         {:description (str "Error rendering prompt: " (.getMessage e))
+                          :messages [{:role :assistant
+                                      :content (str "Failed to render prompt template: " (.getMessage e))}]}))))})))
+
+(defn create-prompts-from-config
+  "Creates prompts from configuration map.
+   Returns a seq of prompt maps."
+  [prompts-config working-dir nrepl-client-atom]
+  (keep
+   (fn [[prompt-name config]]
+     (create-prompt-from-config (name prompt-name) config working-dir nrepl-client-atom))
+   prompts-config))
+
+(defn default-prompts
+  "Returns the default prompts as a list."
+  [nrepl-client-atom working-dir]
+  [{:name "clojure_repl_system_prompt"
+    :description "Provides instructions and guidelines for Clojure development, including style and best practices."
+    :arguments []
+    :prompt-fn (simple-content-prompt-fn
+                "System Prompt: Clojure REPL"
+                (str
+                 (load-prompt-from-resource "clojure-mcp/prompts/system/clojure_repl_form_edit.md")
+                 (load-prompt-from-resource "clojure-mcp/prompts/system/clojure_form_edit.md")))}
+   (create-project-summary working-dir)
+   chat-session-summary
+   resume-chat-session
+   plan-and-execute
+   (add-dir nrepl-client-atom)
+   (scratch-pad-load nrepl-client-atom)
+   (scratch-pad-save-as nrepl-client-atom)])
+
+(defn make-prompts
+  "Creates all prompts for the MCP server, combining defaults with configuration.
+   Config prompts can override defaults by using the same name."
+  [nrepl-client-atom]
+  (let [working-dir (config/get-nrepl-user-dir @nrepl-client-atom)
+
+        ;; Get default prompts
+        default-prompts-list (default-prompts nrepl-client-atom working-dir)
+
+        ;; Get configured prompts from config
+        config-prompts (config/get-prompts @nrepl-client-atom)
+        config-prompts-list (when config-prompts
+                              (create-prompts-from-config
+                               config-prompts
+                               working-dir
+                               nrepl-client-atom))
+
+        ;; Merge prompts, with config overriding defaults by name
+        all-prompts (if config-prompts-list
+                      (let [config-names (set (map :name config-prompts-list))
+                            filtered-defaults (remove #(contains? config-names (:name %))
+                                                      default-prompts-list)]
+                        (concat filtered-defaults config-prompts-list))
+                      default-prompts-list)]
+
+    ;; Return all prompts - filtering happens in core.clj
+    all-prompts))
