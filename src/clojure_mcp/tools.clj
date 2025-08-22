@@ -26,14 +26,11 @@
 
 (def agent-tool-syms
   "Symbols for agent tool creation functions (require API keys)"
-  ['clojure-mcp.tools.dispatch-agent.tool/dispatch-agent-tool
-   'clojure-mcp.tools.architect.tool/architect-tool
-   'clojure-mcp.tools.agent-tool-builder.tool/create-agent-tools])
+  ['clojure-mcp.tools.agent-tool-builder.tool/create-agent-tools])
 
 (def experimental-tool-syms
   "Symbols for experimental tool creation functions"
-  ['clojure-mcp.tools.scratch-pad.tool/scratch-pad-tool
-   'clojure-mcp.tools.code-critique.tool/code-critique-tool])
+  ['clojure-mcp.tools.scratch-pad.tool/scratch-pad-tool])
 
 ;; Note: introspection tools are already included in read-only-tool-syms
 ;; This is kept for documentation purposes but not used in all-tool-syms
