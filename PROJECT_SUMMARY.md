@@ -47,18 +47,17 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/grep/`: Content searching in files
 - `/src/clojure_mcp/tools/glob_files/`: Pattern-based file finding
 - `/src/clojure_mcp/tools/project/`: Project structure analysis
-- `/src/clojure_mcp/tools/code_critique/`: Code quality feedback
-  - **Enhanced**: Auto-configures models from `:tools-config {:code_critique {:model ...}}`
+- `/src/clojure_mcp/tools/agent_tool_builder/`: **NEW** - Configuration-based agent tool system
+  - `tool.clj`: Creates agent tools from configurations
+  - `core.clj`: Core functionality for building and running agents
+  - `default_agents.clj`: Default configurations for dispatch_agent, architect, code_critique, and clojure_edit_agent
+  - `file_changes.clj`: Tracks file changes for agent operations
 - `/src/clojure_mcp/tools/think/`: Reflective thinking tool for AI assistants
 - `/src/clojure_mcp/tools/bash/`: Shell command execution
   - **NEW**: Uses a separate nREPL session for isolation
   - Each bash tool instance creates its own session on initialization
   - Commands execute in an isolated environment from the main REPL
   - Supports both nREPL and local execution modes via config
-- `/src/clojure_mcp/tools/dispatch_agent/`: Agent dispatching for complex tasks
-  - **Enhanced**: Auto-configures models from `:tools-config {:dispatch_agent {:model ...}}`
-- `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
-  - **Enhanced**: Auto-configures models from `:tools-config {:architect {:model ...}}`
 - `/src/clojure_mcp/tools/scratch_pad/`: Persistent scratch pad for inter-tool communication
   - `core.clj`: Core functionality for data storage and retrieval
   - `tool.clj`: MCP integration with path-based operations (set_path, get_path, delete_path)
@@ -272,19 +271,22 @@ The following tools are available in the default configuration (`main.clj`):
 |-----------|-------------|---------------|
 | `clojure_inspect_project` | Analyzes and provides detailed information about a Clojure project's structure | Understanding project organization, dependencies |
 
-### Agent Tools (Require API Keys)
+### Agent Tools (Configuration-Based)
+
+Default agent tools are automatically created through the agent-tool-builder system. These can be customized via `:tools-config` or completely replaced via `:agents` configuration:
 
 | Tool Name | Description | Example Usage |
 |-----------|-------------|---------------|
 | `dispatch_agent` | Launch a new agent that has access to read-only tools | Multi-step file exploration and analysis |
 | `architect` | Your go-to tool for any technical or coding task | System design, architecture decisions |
+| `code_critique` | Provides constructive feedback on Clojure code | Iterative code quality improvement |
+| `clojure_edit_agent` | Efficiently applies multiple code changes | Structural editing of multiple files |
 
 ### Experimental Tools
 
 | Tool Name | Description | Example Usage |
 |-----------|-------------|---------------|
 | `scratch_pad` | A persistent scratch pad for storing structured data between tool calls | Task tracking, intermediate results, inter-agent communication |
-| `code_critique` | Starts an interactive code review conversation that provides constructive feedback on your Clojure code | Iterative code quality improvement |
 
 ## Tool Examples
 
@@ -527,6 +529,13 @@ See `/doc/custom-mcp-server.md` for comprehensive documentation on creating cust
    - See `sse-main.clj` for an example implementation
 
 ## Recent Organizational Changes
+
+**Agent Tools Refactoring**: Replaced individual hardcoded agent tools with a configuration-based system:
+- Agent tools (dispatch_agent, architect, code_critique, clojure_edit_agent) now created through agent-tool-builder
+- Default agents automatically available but can be customized via `:tools-config`
+- Users can override defaults completely via `:agents` configuration
+- Merges tool-specific configurations from `:tools-config` into default agents
+- Removed 600+ lines of redundant code while maintaining backward compatibility
 
 **Model Configuration Support**: Added support for user-defined model configurations via `.clojure-mcp/config.edn`:
 - Users can define custom named model configurations under the `:models` key
