@@ -3,6 +3,7 @@
    [clojure.test :refer :all]
    [clojure-mcp.tools.agent-tool-builder.tool :as agent-builder]
    [clojure-mcp.tools.agent-tool-builder.core :as core]
+   [clojure-mcp.tools.agent-tool-builder.default-agents :as default-agents]
    [clojure-mcp.tools :as tools]
    [clojure-mcp.config :as config]))
 
@@ -39,11 +40,12 @@
       (is (= tools filtered) "':all' enable-tools should return all tools"))))
 
 (deftest test-create-agent-tools
-  (testing "Empty agents config returns empty vector"
+  (testing "Default agents are always created even with empty config"
     (let [nrepl-atom (atom {::config/config {:agents []}})]
-      (is (= [] (agent-builder/create-agent-tools nrepl-atom)))))
+      ;; Should create the 4 default agents
+      (is (= 4 (count (agent-builder/create-agent-tools nrepl-atom))))))
 
-  (testing "Creates tools for configured agents"
+  (testing "Creates tools for configured agents plus defaults"
     (let [agent-config {:id :test-agent
                         :name "test_agent"
                         :description "Test agent"
@@ -54,12 +56,14 @@
           nrepl-atom (atom {::config/config {:agents [agent-config]}})]
 
       (let [tools (agent-builder/create-agent-tools nrepl-atom)]
-        (is (= 1 (count tools)))
-        (let [tool (first tools)]
-          (is (map? tool))
-          (is (:name tool))
-          (is (:description tool))
-          (is (:schema tool)))))))
+        ;; Should have 4 defaults + 1 user agent
+        (is (= 5 (count tools)))
+        (let [tool-names (map :name tools)]
+          (is (some #{"test_agent"} tool-names))
+          (is (some #{"dispatch_agent"} tool-names))
+          (is (some #{"architect"} tool-names))
+          (is (some #{"code_critique"} tool-names))
+          (is (some #{"clojure_edit_agent"} tool-names)))))))
 
 (deftest test-agent-config-retrieval
   (testing "Get agents config"
@@ -128,3 +132,106 @@
                                              (:enable-tools agent-config)
                                              nil))]
           (is (= 2 (count filtered)) "Agent with [:all] should get all tools"))))))
+
+(deftest test-merge-tool-config-into-agent
+  (testing "Merging tool config into agent config"
+    (let [base-agent {:id :test-agent
+                      :name "test_agent"
+                      :description "Original description"
+                      :system-message "Original system message"
+                      :context true
+                      :enable-tools [:LS :read_file]
+                      :memory-size 100}
+
+          tool-config {:model :openai/gpt-4
+                       :context ["specific-file.md"]
+                       :memory-size 200
+                       :enable-tools [:all]
+                       :ignored-key "This should not be merged"}
+
+          merged (default-agents/merge-tool-config-into-agent base-agent tool-config)]
+
+      ;; Check that appropriate keys are merged
+      (is (= (:model merged) :openai/gpt-4))
+      (is (= (:memory-size merged) 200))
+      (is (= (:enable-tools merged) [:all]))
+      (is (= (:context merged) ["specific-file.md"]))
+
+      ;; Check that other keys are preserved
+      (is (= (:id merged) :test-agent))
+      (is (= (:description merged) "Original description"))
+
+      ;; Check that non-agent keys are not merged
+      (is (nil? (:ignored-key merged))))))
+
+(deftest test-default-agents-with-tool-config
+  (testing "Default agents are properly merged with tool configs"
+    (let [test-atom (atom {})
+          _ (config/set-config! test-atom :tools-config
+                                {:dispatch_agent {:memory-size 200
+                                                  :model :openai/gpt-4
+                                                  :enable-tools [:all]}
+                                 :code_critique {:memory-size 50
+                                                 :system-message "Custom critique"}
+                                 :architect {:context true
+                                             :enable-tools [:all]}})
+
+          ;; Get the default agents
+          agents (agent-builder/create-agent-tools test-atom)
+          agent-names (map :name agents)]
+
+      ;; Should have 4 default agents
+      (is (= (count agents) 4))
+
+      ;; Check that all default agents are present
+      (is (some #{"dispatch_agent"} agent-names))
+      (is (some #{"architect"} agent-names))
+      (is (some #{"code_critique"} agent-names))
+      (is (some #{"clojure_edit_agent"} agent-names)))))
+
+(deftest test-user-agents-override-defaults
+  (testing "User-defined agents override default agents with same ID"
+    (let [test-atom (atom {})
+          _ (config/set-config! test-atom :agents
+                                [{:id :dispatch-agent
+                                  :name "custom_dispatch"
+                                  :description "Custom dispatch agent"
+                                  :system-message "Custom system message"
+                                  :context false
+                                  :enable-tools nil
+                                  :memory-size 10}])
+
+          agents (agent-builder/create-agent-tools test-atom)
+          agent-names (map :name agents)]
+
+      ;; Should still have 4 agents total
+      (is (= (count agents) 4))
+
+      ;; Check that the custom agent replaced the default
+      (is (some #{"custom_dispatch"} agent-names))
+      (is (not (some #{"dispatch_agent"} agent-names))))))
+
+(deftest test-tool-config-and-user-agents-interaction
+  (testing "Tool config applies to defaults but user agents override completely"
+    (let [test-atom (atom {})
+          _ (config/set-config! test-atom :tools-config
+                                {:dispatch_agent {:memory-size 200}
+                                 :architect {:memory-size 300}})
+          _ (config/set-config! test-atom :agents
+                                [{:id :architect
+                                  :name "user_architect"
+                                  :description "User's architect"
+                                  :system-message "User's message"
+                                  :context false
+                                  :enable-tools nil
+                                  :memory-size 50}])
+
+          agents (agent-builder/create-agent-tools test-atom)
+          agent-names (map :name agents)]
+
+      ;; Check that user's architect overrides the default completely
+      (is (some #{"user_architect"} agent-names))
+      (is (not (some #{"architect"} agent-names)))
+
+      ;; dispatch_agent should still use tool config since not overridden
+      (is (some #{"dispatch_agent"} agent-names)))))
