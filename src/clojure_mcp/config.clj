@@ -327,6 +327,11 @@
       :else (and (contains? enable-set resource-name)
                  (not (contains? disable-set resource-name))))))
 
+(defn get-resources
+  "Get the resources configuration map from config"
+  [nrepl-client-map]
+  (get-config nrepl-client-map :resources))
+
 (defn set-config*
   "Sets a config value in a map. Returns the updated map.
    This is the core function that set-config! uses."

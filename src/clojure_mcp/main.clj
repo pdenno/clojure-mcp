@@ -11,42 +11,10 @@
             [clojure-mcp.config :as config]
             [clojure-mcp.tools :as tools]))
 
-;; Define the resources you want available
+;; Delegate to resources namespace
+;; Note: working-dir param kept for compatibility with core API but unused
 (defn make-resources [nrepl-client-atom working-dir]
-  (keep
-   identity
-   [(resources/create-file-resource
-     "custom://project-summary"
-     "PROJECT_SUMMARY.md"
-     "A Clojure project summary document for the project hosting the REPL, this is intended to provide the LLM with important context to start."
-     "text/markdown"
-     (.getCanonicalPath (io/file working-dir "PROJECT_SUMMARY.md")))
-    (resources/create-file-resource
-     "custom://readme"
-     "README.md"
-     "A README document for the current Clojure project hosting the REPL"
-     "text/markdown"
-     (.getCanonicalPath (io/file working-dir "README.md")))
-    (resources/create-file-resource
-     "custom://claude"
-     "CLAUDE.md"
-     "The Claude instructions document for the current project hosting the REPL"
-     "text/markdown"
-     (.getCanonicalPath (io/file working-dir "CLAUDE.md")))
-    (resources/create-file-resource
-     "custom://llm-code-style"
-     "LLM_CODE_STYLE.md"
-     "Guidelines for writing Clojure code for the current project hosting the REPL"
-     "text/markdown"
-     (str working-dir "/LLM_CODE_STYLE.md"))
-    (let [{:keys [outputs error]} (project/inspect-project nrepl-client-atom)] ; Changed from @nrepl-client-atom
-      (when-not error
-        (resources/create-string-resource
-         "custom://project-info"
-         "Clojure Project Info"
-         "Information about the current Clojure project structure, attached REPL environment and dependencies"
-         "text/markdown"
-         outputs)))]))
+  (resources/make-resources nrepl-client-atom))
 
 (defn make-prompts [nrepl-client-atom working-dir]
   [{:name "clojure_repl_system_prompt"
@@ -78,7 +46,7 @@
    (make-prompts nrepl-client-atom working-dir)))
 
 (defn ^:deprecated my-resources [nrepl-client-atom working-dir]
-  (make-resources nrepl-client-atom working-dir))
+  (resources/make-resources nrepl-client-atom))
 
 (defn ^:deprecated my-tools [nrepl-client-atom]
   (tools/build-all-tools nrepl-client-atom))
