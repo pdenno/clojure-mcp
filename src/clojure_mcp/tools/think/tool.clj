@@ -11,7 +11,7 @@
 Common use cases:
 * when having difficulty finding/reading the files you need
 * when having difficulty writing out code
-* when having using the tools or the clojure tools
+* when using the tools or the clojure tools
 * When exploring a repository and discovering the source of a bug, call this tool to brainstorm several unique ways of fixing the bug, and assess which change(s) are likely to be simplest and most effective
 * After receiving test results, use this tool to brainstorm ways to fix failing tests
 * When planning a complex refactoring, use this tool to outline different approaches and their tradeoffs

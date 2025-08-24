@@ -64,7 +64,7 @@ Want to add your own documentation? Create your own `make-resources` function:
      "Our system architecture documentation"
      "text/markdown"
      (.getCanonicalPath (io/file working-dir "docs/ARCHITECTURE.md")))
-    
+
     (resources/create-string-resource
      "custom://team-standards"
      "Team Coding Standards"
@@ -166,7 +166,7 @@ Add project-specific prompts to guide your AI assistant:
                                             (get args "table-name")
                                             " operation: " (get args "operation")
                                             "\nUse our standard migration format.")}]}))}
-    
+
     {:name "test-generator"
      :description "Generate test cases for a namespace"
      :arguments [{:name "namespace"
@@ -203,18 +203,18 @@ Tools are just maps, so you can modify them in your factory function:
     (map (fn [tool]
            (case (:name tool)
              ;; Rename bash to be more specific
-             "bash" (assoc tool 
+             "bash" (assoc tool
                           :name "shell_command"
                           :description "Execute shell commands in the project directory. Use for: git operations, running tests, file system operations.")
-             
+
              ;; Make file reading more prominent
              "read_file" (assoc tool
                                :description "READ FILES FIRST! Always use this before editing. Smart reader with pattern matching for Clojure files.")
-             
+
              ;; Discourage use of file_edit in favor of clojure_edit
              "file_edit" (assoc tool
                                :description "Simple text replacement - AVOID for Clojure files! Use clojure_edit instead.")
-             
+
              ;; Return unchanged
              tool))
          standard-tools)))
@@ -232,9 +232,9 @@ If you're combining tools from multiple sources:
   (concat
    ;; Standard tools with prefix
    (prefix-tool-names "core" (main/make-tools nrepl-client-atom working-directory))
-   
+
    ;; Your custom tools with different prefix
-   (prefix-tool-names "custom" 
+   (prefix-tool-names "custom"
                       [(my-special-tool/special-tool nrepl-client-atom)])))
 ```
 
@@ -252,7 +252,7 @@ Here's how to selectively modify components while keeping what you want:
 (defn customize-for-safety [tool]
   ;; Make all editing tools warn about safety
   (if (str/includes? (:name tool) "edit")
-    (update tool :description 
+    (update tool :description
             #(str "⚠️ CAUTION: This modifies files! " %))
     tool))
 
@@ -275,15 +275,15 @@ Here's how to selectively modify components while keeping what you want:
      (map (fn [resource]
             (case (:name resource)
               ;; Make project summary more prominent
-              "PROJECT_SUMMARY.md" 
-              (assoc resource 
+              "PROJECT_SUMMARY.md"
+              (assoc resource
                      :name "MAIN_PROJECT_CONTEXT"
                      :description "CRITICAL: Primary project documentation - ALWAYS load this first!")
-              
+
               ;; Keep others as-is
               resource))
           standard-resources)
-     
+
      ;; Add your own
      [(resources/create-file-resource
        "custom://runbook"
@@ -398,8 +398,8 @@ Here's a full template you can use as a starting point:
 Point your deps.edn to your custom server:
 
 ```clojure
-{:aliases 
-  {:my-mcp 
+{:aliases
+  {:my-mcp
     {:deps {org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
             com.bhauman/clojure-mcp {:local/root "~/workspace/clojure-mcp"}}
      :extra-paths ["src"] ; Where your custom server lives

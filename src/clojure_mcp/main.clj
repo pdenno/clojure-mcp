@@ -128,6 +128,7 @@
   (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)]
     (make-tools nrepl-client-atom working-directory)))
 
+;;; (clojure-mcp.main/start-mcp-server {:port 7888})
 (defn start-mcp-server [opts]
   (core/build-and-start-mcp-server
    opts

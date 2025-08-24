@@ -67,11 +67,11 @@ Here's a simple example of a prompt without arguments:
 
 (def code-review-prompt
   {:name "code_review_guide"
-   
+
    :description "Provides guidelines for conducting thorough code reviews"
-   
+
    :arguments [] ; No arguments needed
-   
+
    :prompt-fn (fn [_exchange _request-args callback]
                 (callback
                  {:description "Code Review Guidelines"
@@ -113,13 +113,13 @@ This ensures the REPL has the latest version of the namespace."
 
 (def namespace-sync-prompt
   {:name "sync_namespace"
-   
+
    :description "Generates instructions for synchronizing REPL with a specific namespace"
-   
+
    :arguments [{:name "namespace"
                 :description "The fully qualified Clojure namespace (e.g., 'myapp.core')"
                 :required? true}]
-   
+
    :prompt-fn (fn [_exchange request-args callback]
                 (let [namespace-name (get request-args "namespace")]
                   (if namespace-name
@@ -143,16 +143,16 @@ Prompts can return multiple messages to set up a conversation context:
 
 (def refactoring-lesson-prompt
   {:name "teach_refactoring"
-   
+
    :description "Interactive lesson on refactoring Clojure code"
-   
+
    :arguments [{:name "code_snippet"
                 :description "The code to refactor"
                 :required? true}
                {:name "focus_area"
                 :description "Specific aspect to focus on (e.g., 'performance', 'readability')"
                 :required? false}]
-   
+
    :prompt-fn (fn [_exchange request-args callback]
                 (let [code (get request-args "code_snippet")
                       focus (get request-args "focus_area" "general improvement")]
@@ -160,7 +160,7 @@ Prompts can return multiple messages to set up a conversation context:
                     (callback
                      {:description "Interactive refactoring lesson"
                       :messages [{:role :user
-                                  :content (str "I have this code that needs refactoring:\n\n```clojure\n" 
+                                  :content (str "I have this code that needs refactoring:\n\n```clojure\n"
                                                code "\n```\n\n"
                                                "Focus area: " focus)}
                                  {:role :assistant
@@ -190,7 +190,7 @@ You can create helper functions to simplify prompt creation:
                   :messages [{:role :assistant :content content}]}))})
 
 ;; Usage example
-(def style-guide 
+(def style-guide
   (simple-prompt "clojure_style"
                  "Clojure style guidelines"
                  "Follow these Clojure style guidelines:
@@ -227,7 +227,7 @@ You can test your prompt function independently:
                           (println (str "  " (:role msg) ": " (:content msg)))))]
     ;; Test with valid input
     ((:prompt-fn namespace-sync-prompt) nil {"namespace" "myapp.core"} test-callback)
-    
+
     ;; Test with missing input
     ((:prompt-fn namespace-sync-prompt) nil {} test-callback)))
 ```
@@ -281,27 +281,27 @@ Here's a more complete test example showing different parameter scenarios:
   (let [test-callback (fn [result]
                         (println "\nResult:")
                         (println result))]
-    
+
     ;; Test 1: All required parameters provided
     (println "Test 1: Valid parameters")
-    ((:prompt-fn refactoring-lesson-prompt) 
-     nil 
+    ((:prompt-fn refactoring-lesson-prompt)
+     nil
      {"code_snippet" "(defn add [a b] (+ a b))"
-      "focus_area" "performance"} 
+      "focus_area" "performance"}
      test-callback)
-    
+
     ;; Test 2: Optional parameter omitted (uses default)
     (println "\nTest 2: Optional parameter omitted")
-    ((:prompt-fn refactoring-lesson-prompt) 
-     nil 
-     {"code_snippet" "(defn add [a b] (+ a b))"} 
+    ((:prompt-fn refactoring-lesson-prompt)
+     nil
+     {"code_snippet" "(defn add [a b] (+ a b))"}
      test-callback)
-    
+
     ;; Test 3: Required parameter missing (error case)
     (println "\nTest 3: Missing required parameter")
-    ((:prompt-fn refactoring-lesson-prompt) 
-     nil 
-     {"focus_area" "readability"} 
+    ((:prompt-fn refactoring-lesson-prompt)
+     nil
+     {"focus_area" "readability"}
      test-callback)))
 ```
 

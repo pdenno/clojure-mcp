@@ -157,8 +157,8 @@ Create a highly restricted ClojureMCP server using the documentation:
 ## Example: Complete Prompt for a Custom Server
 
 ```
-I need a custom ClojureMCP server for working on my web application. Using the attached 
-ClojureMCP documentation (custom-mcp-server.md, creating-tools-multimethod.md, 
+I need a custom ClojureMCP server for working on my web application. Using the attached
+ClojureMCP documentation (custom-mcp-server.md, creating-tools-multimethod.md,
 creating-prompts.md, creating-resources.md), please generate a complete custom server with:
 
 TOOLS:
@@ -183,7 +183,7 @@ CONFIGURATION:
 - Start on port 4000
 - Include helpful startup message about available tools
 
-Please generate the complete main.clj file with all necessary imports and the server 
+Please generate the complete main.clj file with all necessary imports and the server
 implementation. Include comments explaining key decisions.
 ```
 

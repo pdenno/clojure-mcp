@@ -72,13 +72,13 @@ Here's a simple example of a static resource:
 
 (def coding-guidelines-resource
   {:url "custom://coding-guidelines"
-   
+
    :name "Coding Guidelines"
-   
+
    :description "Project coding standards and best practices"
-   
+
    :mime-type "text/markdown"
-   
+
    :resource-fn (fn [_exchange _request callback]
                   (callback
                    ["# Coding Guidelines
@@ -119,13 +119,13 @@ Here's an example that reads content from a file:
 
 (def readme-resource
   {:url "custom://project-readme"
-   
+
    :name "README.md"
-   
+
    :description "Project README file with setup instructions"
-   
+
    :mime-type "text/markdown"
-   
+
    :resource-fn (fn [_exchange _request callback]
                   (let [content (read-file-safely "README.md")]
                     (callback content)))})
@@ -142,7 +142,7 @@ Resources can provide dynamic content that changes over time:
            [java.time.format DateTimeFormatter]))
 
 (defn get-system-info []
-  {:timestamp (.format (LocalDateTime/now) 
+  {:timestamp (.format (LocalDateTime/now)
                        (DateTimeFormatter/ISO_LOCAL_DATE_TIME))
    :java-version (System/getProperty "java.version")
    :os-name (System/getProperty "os.name")
@@ -153,20 +153,20 @@ Resources can provide dynamic content that changes over time:
 
 (def system-info-resource
   {:url "custom://system-info"
-   
+
    :name "System Information"
-   
+
    :description "Current system and JVM information"
-   
+
    :mime-type "application/json"
-   
+
    :resource-fn (fn [_exchange _request callback]
                   (try
                     (let [info (get-system-info)
                           json-str (json/write-str info {:indent true})]
                       (callback [json-str]))
                     (catch Exception e
-                      (callback [(str "Error generating system info: " 
+                      (callback [(str "Error generating system info: "
                                      (.getMessage e))]))))})
 ```
 
@@ -192,13 +192,13 @@ Resources can return multiple strings in the vector for multi-part content:
 
 (def project-report-resource
   {:url "custom://project-report"
-   
+
    :name "Project Report"
-   
+
    :description "Comprehensive project analysis report"
-   
+
    :mime-type "text/markdown"
-   
+
    :resource-fn (fn [_exchange _request callback]
                   (let [project-data {:name "my-project"
                                      :version "1.0.0"
@@ -227,7 +227,7 @@ Resources can return multiple strings in the vector for multi-part content:
 
 ## How Resources Are Accessed
 
-Unlike tools and prompts, resources are typically accessed without parameters. The client simply requests the resource by its URL.
+Unlike tools and prompts, resources are typically accessed without parameters. The client simply requests the resource by its URL.g
 
 ### Client Side (MCP Client)
 The client sends a request like:
@@ -259,7 +259,7 @@ While most resources ignore the request parameter, advanced use cases might exam
    :description "Documentation that can show different versions"
    :mime-type "text/markdown"
    :resource-fn (fn [exchange request callback]
-                  ;; In practice, the request object structure depends on the MCP 
+                  ;; In practice, the request object structure depends on the MCP
                   ;; implementation, but you might extract version info if supported
                   (let [version "latest" ; Default version
                         content (case version
@@ -319,7 +319,7 @@ Create documentation on-the-fly:
 ```clojure
 (defn generate-api-docs [api-endpoints]
   (str "# API Documentation\n\n"
-       (str/join "\n\n" 
+       (str/join "\n\n"
                  (map (fn [{:keys [method path description]}]
                         (format "## %s %s\n%s" method path description))
                       api-endpoints))))
@@ -330,9 +330,9 @@ Create documentation on-the-fly:
    :description "Auto-generated API documentation"
    :mime-type "text/markdown"
    :resource-fn (fn [_ _ callback]
-                  (let [endpoints [{:method "GET" :path "/users" 
+                  (let [endpoints [{:method "GET" :path "/users"
                                    :description "List all users"}
-                                  {:method "POST" :path "/users" 
+                                  {:method "POST" :path "/users"
                                    :description "Create a new user"}]
                         docs (generate-api-docs endpoints)]
                     (callback [docs])))})
@@ -343,7 +343,7 @@ Combine multiple sources into one resource:
 
 ```clojure
 (defn read-files [file-paths]
-  (map #(try (slurp %) 
+  (map #(try (slurp %)
              (catch Exception e (str "Error reading " % ": " (.getMessage e))))
        file-paths))
 

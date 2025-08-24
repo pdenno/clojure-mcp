@@ -91,7 +91,7 @@ The scratch pad is for persistent storage and state management, not for formatti
 
 Use the scratch pad when you need to:
 - Track progress across multiple tool calls
-- Build data structures incrementally  
+- Build data structures incrementally
 - Maintain state between operations
 - Store intermediate results for later use
 
@@ -367,7 +367,7 @@ Viewing tasks:
 
 (defn scratch-pad-tool
   "Returns the registration map for the scratch pad tool.
-   
+
    Parameters:
    - nrepl-client-atom: Atom containing the nREPL client
    - working-directory: The working directory for file persistence"

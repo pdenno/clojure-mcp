@@ -3,7 +3,7 @@
 ## [v0.1.6-alpha] - 2025-06-30
 
 ### Performance Improvements
-- **Optimized `clojure_inspect_project`** with ~3.8x speedup by reducing glob operations from 5 calls to 1 using brace expansion patterns 
+- **Optimized `clojure_inspect_project`** with ~3.8x speedup by reducing glob operations from 5 calls to 1 using brace expansion patterns
 - **Added ripgrep recommendation** to README prerequisites for better `grep` and `glob_files` performance
 
 ### Fixed
@@ -80,7 +80,7 @@ across all chat sessions in chat client.
 
 For complex features, use the new `plan-and-execute` prompt which leverages scratch_pad to:
 - Research problems thoroughly
-- Break down tasks into manageable subtasks  
+- Break down tasks into manageable subtasks
 - Track progress with structured todo lists
 - Maintain context throughout development
 
