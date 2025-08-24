@@ -46,6 +46,15 @@
       (is (not (sut/is-top-level-form? defn-loc "def" "example-fn")))
       (is (not (sut/is-top-level-form? defn-loc "defn" "other-fn"))))))
 
+(deftest is-top-level-form-private-test
+  (testing "is-top-level-form? matches private defn and def forms"
+    (let [source "(ns test.core)\n\n(defn- hidden [] :secret)\n\n(def- secret 1)"
+          zloc (get-zloc source)
+          defn-loc (z/right zloc)
+          def-loc (z/right defn-loc)]
+      (is (sut/is-top-level-form? defn-loc "defn" "hidden"))
+      (is (sut/is-top-level-form? def-loc "def" "secret")))))
+
 (deftest is-top-level-form-with-defmethod-test
   (testing "is-top-level-form? correctly identifies defmethod forms"
     (let [source "(ns test.multimethods)\n\n(defmulti area :shape)\n\n(defmethod area :rectangle [rect]\n  (* (:width rect) (:height rect)))\n\n(defmethod area :circle [circle]\n  (* Math/PI (:radius circle) (:radius circle)))"
@@ -76,6 +85,13 @@
       (is (some? (:zloc (sut/find-top-level-form zloc "def" "a"))))
       (is (nil? (:zloc (sut/find-top-level-form zloc "defn" "non-existent"))))
       (is (nil? (:zloc (sut/find-top-level-form zloc "def" "example-fn")))))))
+
+(deftest find-top-level-form-private-test
+  (testing "find-top-level-form finds private defn and def forms"
+    (let [source "(ns test.core)\n\n(defn- hidden [] :secret)\n\n(def- secret 1)"
+          zloc (get-zloc source)]
+      (is (some? (:zloc (sut/find-top-level-form zloc "defn" "hidden"))))
+      (is (some? (:zloc (sut/find-top-level-form zloc "def" "secret")))))))
 
 (deftest find-top-level-form-with-defmethod-test
   (testing "find-top-level-form finds defmethod forms correctly"
@@ -134,6 +150,275 @@
       (is (str/includes? result-str "(defn helper-fn [z]\n  (* z z))"))
       (is (str/includes? result-str "(defn example-fn [x y]\n  (+ x y))")
           "Original form should still be present"))))
+
+(deftest replace-top-level-form-test
+  (testing "replace with comment-prefixed content removes old comments"
+    (let [source "(defn add [a b] (+ a b))
+
+;; This old comment will be removed
+;; when replaced with new comment
+(defn greet [name]
+  (println \"Hi\" name))"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'greet)
+                   z/up)
+          replacement ";; This is the new greeting function
+(defn greet [name]
+  (println \"Hello,\" name \"!\"))"
+          result (sut/replace-top-level-form zloc replacement)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str ";; This is the new greeting function"))
+      (is (str/includes? result-str "(println \"Hello,\" name \"!\")"))
+      (is (not (str/includes? result-str ";; This old comment will be removed")))
+      (is (not (str/includes? result-str "(println \"Hi\" name)")))))
+
+  (testing "replace without comment-prefixed content preserves old comments"
+    (let [source "(defn add [a b] (+ a b))
+
+;; This comment should be preserved
+;; when replaced without new comment
+(defn greet [name]
+  (println \"Hi\" name))"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'greet)
+                   z/up)
+          replacement "(defn greet [name]
+  (println \"Howdy,\" name \"!\"))"
+          result (sut/replace-top-level-form zloc replacement)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str ";; This comment should be preserved"))
+      (is (str/includes? result-str "(println \"Howdy,\" name \"!\")"))
+      (is (not (str/includes? result-str "(println \"Hi\" name)")))))
+
+  (testing "respects blank line boundaries"
+    (let [source ";; Copyright notice
+;; Author: Someone
+
+;; This is a utility function
+;; It does something important
+(defn util [x]
+  (* x 2))"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'util)
+                   z/up)
+          replacement ";; Improved utility function
+(defn util [x]
+  (* x 3))"
+          result (sut/replace-top-level-form zloc replacement)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str ";; Copyright notice"))
+      (is (str/includes? result-str ";; Author: Someone"))
+      (is (str/includes? result-str ";; Improved utility function"))
+      (is (str/includes? result-str "(* x 3)"))
+      (is (not (str/includes? result-str ";; This is a utility function")))
+      (is (not (str/includes? result-str "(* x 2)")))))
+
+  (testing "handles no preceding comments"
+    (let [source "(defn standalone []
+  :no-comments)"
+          zloc (get-zloc source)
+          replacement ";; Now it has a comment!
+(defn standalone []
+  :with-comment)"
+          result (sut/replace-top-level-form zloc replacement)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str ";; Now it has a comment!"))
+      (is (str/includes? result-str ":with-comment"))
+      (is (not (str/includes? result-str ":no-comments")))))
+
+  (testing "handles tight spacing with comments"
+    (let [source "(defn add [a b] (+ a b))
+;; comment line
+(defn hello []
+  \"hello\")"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'hello)
+                   z/up)
+          replacement ";; Updated function
+(defn hello []
+  \"updated\")"
+          result (sut/replace-top-level-form zloc replacement)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str ";; Updated function"))
+      (is (str/includes? result-str "\"updated\""))
+      (is (not (str/includes? result-str ";; comment line")))
+      (is (not (str/includes? result-str "\"hello\""))))))
+
+(deftest insert-before-top-level-form-test
+  (testing "inserts before comments that precede a form"
+    (let [source "(defn add [a b] (+ a b))
+
+;; comment for hello
+;; comment line 2
+(defn hello []
+  \"hello\")"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'hello)
+                   z/up)
+          new-content "(defn multiply [a b]
+  (* a b))"
+          result (sut/insert-before-top-level-form zloc new-content)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str "(defn multiply [a b]"))
+      (is (str/includes? result-str ";; comment for hello"))
+      ;; Check ordering - multiply should come before the comments
+      (is (< (.indexOf result-str "multiply")
+             (.indexOf result-str ";; comment for hello")))))
+
+  (testing "inserts with proper spacing when no comments"
+    (let [source "(defn add [a b] (+ a b))
+
+(defn hello []
+  \"hello\")"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'hello)
+                   z/up)
+          new-content "(defn multiply [a b]
+  (* a b))"
+          result (sut/insert-before-top-level-form zloc new-content)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str "(defn multiply [a b]"))
+      (is (str/includes? result-str "(defn hello []"))
+      ;; Should maintain blank line spacing
+      ;; Check that proper spacing is maintained
+      (is (str/includes? result-str "(defn add [a b] (+ a b))"))
+      (is (str/includes? result-str "(defn multiply [a b]"))
+      (is (str/includes? result-str "(defn hello []"))))
+
+  (testing "respects blank line boundaries with multiple comment groups"
+    (let [source "(defn add [a b] (+ a b))
+
+;; Group A comments
+;; stay with add
+
+;; Group B comments
+;; for hello
+(defn hello []
+  \"hello\")"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'hello)
+                   z/up)
+          new-content "(defn multiply [a b]
+  (* a b))"
+          result (sut/insert-before-top-level-form zloc new-content)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str ";; Group A comments"))
+      (is (str/includes? result-str ";; Group B comments"))
+      (is (str/includes? result-str "(defn multiply [a b]"))
+      ;; multiply should be between the two comment groups
+      (is (and (< (.indexOf result-str "Group A")
+                  (.indexOf result-str "multiply"))
+               (< (.indexOf result-str "multiply")
+                  (.indexOf result-str "Group B"))))))
+
+  (testing "handles tight spacing with comments"
+    (let [source "(defn add [a b] (+ a b))
+;; comment for hello
+(defn hello []
+  \"hello\")"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'hello)
+                   z/up)
+          new-content "(defn multiply [a b]
+  (* a b))"
+          result (sut/insert-before-top-level-form zloc new-content)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str "(defn add [a b] (+ a b))"))
+      (is (str/includes? result-str "(defn multiply [a b]"))
+      (is (str/includes? result-str ";; comment for hello"))
+      (is (str/includes? result-str "(defn hello []"))
+      ;; Check proper ordering
+      (let [add-idx (.indexOf result-str "add")
+            multiply-idx (.indexOf result-str "multiply")
+            comment-idx (.indexOf result-str ";; comment")
+            hello-idx (.indexOf result-str "hello []")]
+        (is (< add-idx multiply-idx comment-idx hello-idx)))))
+
+  (testing "inserts before first function with file header comments"
+    (let [source ";; File header
+;; Copyright info
+
+;; First function docs
+(defn first-fn []
+  :first)"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'first-fn)
+                   z/up)
+          new-content "(defn new-first []
+  :new)"
+          result (sut/insert-before-top-level-form zloc new-content)
+          result-str (z/root-string result)]
+      (is (str/includes? result-str ";; File header"))
+      (is (str/includes? result-str "(defn new-first []"))
+      (is (str/includes? result-str ";; First function docs"))
+      ;; Check ordering - header, then new function, then original comments and function
+      (let [header-idx (.indexOf result-str ";; File header")
+            new-idx (.indexOf result-str "new-first")
+            docs-idx (.indexOf result-str ";; First function docs")
+            first-idx (.indexOf result-str "first-fn")]
+        (is (< header-idx new-idx docs-idx first-idx))))))
+
+(deftest walk-back-to-non-comment-test
+  (testing "finds the first non-comment node going backwards"
+    (let [source ";; file header
+(defn first []
+  :first)
+
+;; comment before second
+(defn second []
+  :second)"
+          zloc (-> (get-zloc source)
+                   (z/find-value z/next 'second)
+                   z/up)
+          result (sut/walk-back-to-non-comment zloc)]
+      (is (= :newline (z/tag result)))
+      (is (= "\n\n" (z/string result)))))
+
+  (testing "handles case with no preceding elements"
+    (let [source "(defn first []
+  :first)"
+          zloc (get-zloc source)
+          result (sut/walk-back-to-non-comment zloc)]
+      ;; walk-back returns the parent forms node when at the beginning
+      (is (= :forms (z/tag result))))))
+
+(deftest remove-consecutive-comments-test
+  (testing "removes consecutive whitespace and comments"
+    (let [source ";; comment 1
+;; comment 2
+(defn test [])"
+          ;; Start with a zipper positioned at the first comment
+          zloc (z/of-string* source)
+          result (sut/remove-consecutive-comments zloc)
+          result-str (z/root-string result)]
+      ;; The function should remove comments and position at the next non-comment
+      ;; After removing all comments, we're at the root
+      (is (str/includes? result-str "(defn test [])"))
+      ;; Navigate down to find the defn
+      (let [defn-zloc (z/down result)]
+        (is (= :list (z/tag defn-zloc)))
+        (is (str/includes? (z/string defn-zloc) "defn test")))))
+
+  (testing "returns unchanged when starting at non-comment"
+    (let [source "(defn test [])"
+          zloc (get-zloc source)
+          result (sut/remove-consecutive-comments zloc)]
+      ;; Should return the same zloc unchanged
+      (is (= (z/node zloc) (z/node result)))))
+
+  (testing "removes mixed whitespace and comments"
+    (let [source "  ;; comment with leading whitespace
+  
+  ;; another comment
+(defn test [])"
+          zloc (z/of-string* source)
+          result (sut/remove-consecutive-comments zloc)
+          result-str (z/root-string result)]
+      ;; Should end up at the defn
+      ;; After removing comments, we're at root
+      (let [defn-zloc (z/down result)]
+        (is (= :list (z/tag defn-zloc)))
+        (is (str/includes? (z/string defn-zloc) "defn test"))))))
 
 (deftest row-col-offset-test
   (testing "row-col->offset correctly calculates character offsets"
@@ -291,6 +576,18 @@
           zloc (get-zloc source)
           summary (sut/get-form-summary zloc)]
       (is (= "(def a ...)" summary))))
+
+  (testing "get-form-summary provides correct summary for private defn forms"
+    (let [source "(defn- hidden [x] x)"
+          zloc (get-zloc source)
+          summary (sut/get-form-summary zloc)]
+      (is (= "(defn- hidden [x] ...)" summary))))
+
+  (testing "get-form-summary provides correct summary for private def forms"
+    (let [source "(def- secret 1)"
+          zloc (get-zloc source)
+          summary (sut/get-form-summary zloc)]
+      (is (= "(def- secret ...)" summary))))
 
   (testing "get-form-summary returns full form for ns forms"
     (let [source "(ns test.core)"
@@ -588,9 +885,11 @@
 
   (testing "Comments and discards with clean? true"
     (let [s1 "a ;; comment\n #_ ignored b"
-          s2 "a b"
-          result1 (sut/zchild-match-exprs (z/of-string s1) {:clean? true})
-          result2 (sut/zchild-match-exprs (z/of-string s2) {:clean? true})]
+          s2 "a #_  ignored b"
+          result1 (binding [sut/*match-clean* true]
+                    (sut/zchild-match-exprs (z/of-string s1)))
+          result2 (binding [sut/*match-clean* true]
+                    (sut/zchild-match-exprs (z/of-string s2)))]
       (is (= result1 result2) "Comments and discards should be removed when clean? is true")))
 
   (testing "Nested reader macros"
@@ -630,9 +929,11 @@
 
   (testing "Mix of features - comments, discards, reader macros"
     (let [s1 "(defn process ;; main function\n  [data]\n  #_ (println \"debug\")\n  (map #(* % 2) data))"
-          s2 "(defn   process\n[data]   (map   #(*   %   2)   data))"
-          result1-clean (sut/zchild-match-exprs (z/of-string s1) {:clean? true})
-          result2-clean (sut/zchild-match-exprs (z/of-string s2) {:clean? true})]
+          s2 "(defn   process\n[data]   #_ (println \"debug\") \n;; hey \n (map   #(*   %   2)   data))"
+          result1-clean (binding [sut/*match-clean* true]
+                          (sut/zchild-match-exprs (z/of-string s1)))
+          result2-clean (binding [sut/*match-clean* true]
+                          (sut/zchild-match-exprs (z/of-string s2)))]
       (is (= result1-clean result2-clean) "Mixed features should normalize when cleaned"))))
 
 (deftest find-and-edit-multi-sexp-replace-edge-cases-test

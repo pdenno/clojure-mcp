@@ -98,6 +98,7 @@
           (str/ends-with? lower-path ".cljs")
           (str/ends-with? lower-path ".cljc")
           (str/ends-with? lower-path ".bb")
+          (str/ends-with? lower-path ".lpy")
           (str/ends-with? lower-path ".edn")))))
 
 (defn extract-paths-from-bash-command

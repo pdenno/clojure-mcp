@@ -2,14 +2,16 @@
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.java.io :as io]
             [clojure.edn :as edn]
-            [clojure-mcp.tools.project.core :refer [inspect-project-code
-                                                    read-project-clj
+            [clojure-mcp.tools.project.core :refer [read-project-clj
                                                     parse-lein-config
                                                     extract-lein-project-info
                                                     extract-source-paths
                                                     extract-test-paths
                                                     determine-project-type
-                                                    to-relative-path]])
+                                                    to-relative-path
+                                                    read-bb-edn
+                                                    extract-bb-source-paths
+                                                    extract-bb-tasks]])
   (:import [java.io File]
            [java.nio.file Files]))
 
@@ -141,51 +143,125 @@
       (is (nil? info)))))
 
 (deftest extract-source-paths-test
-  (testing "extracts paths from deps.edn"
-    (let [deps {:paths ["src" "resources"]}]
-      (is (= ["src" "resources"] (extract-source-paths deps nil)))))
+  (testing "extracts paths from bb.edn (highest priority)"
+    (let [bb-config {:paths ["bb-src" "bb-resources"]}
+          deps {:paths ["src" "resources"]}
+          lein-config {:source-paths ["src/main/clj"]}]
+      (is (= ["bb-src" "bb-resources"] (extract-source-paths deps lein-config bb-config)))))
 
-  (testing "extracts paths from lein config"
+  (testing "extracts paths from deps.edn when no bb.edn"
+    (let [deps {:paths ["src" "resources"]}]
+      (is (= ["src" "resources"] (extract-source-paths deps nil nil)))))
+
+  (testing "extracts paths from lein config when no deps.edn or bb.edn"
     (let [lein-config {:source-paths ["src/main/clj" "src/shared"]}]
-      (is (= ["src/main/clj" "src/shared"] (extract-source-paths nil lein-config)))))
+      (is (= ["src/main/clj" "src/shared"] (extract-source-paths nil lein-config nil)))))
 
   (testing "defaults to src when no paths specified"
-    (is (= ["src"] (extract-source-paths nil {})))
-    (is (= ["src"] (extract-source-paths {} nil)))
-    (is (= ["src"] (extract-source-paths nil nil))))
+    (is (= ["src"] (extract-source-paths nil {} nil)))
+    (is (= ["src"] (extract-source-paths {} nil nil)))
+    (is (= ["src"] (extract-source-paths nil nil nil))))
 
   (testing "handles invalid path configurations"
     (let [bad-deps {:paths "not-a-vector"}
-          bad-lein {:source-paths 123}]
-      (is (= ["src"] (extract-source-paths bad-deps nil)))
-      (is (= ["src"] (extract-source-paths nil bad-lein))))))
+          bad-lein {:source-paths 123}
+          bad-bb {:paths 456}]
+      (is (= ["src"] (extract-source-paths bad-deps nil nil)))
+      (is (= ["src"] (extract-source-paths nil bad-lein nil)))
+      (is (= ["src"] (extract-source-paths nil nil bad-bb))))))
 
 (deftest extract-test-paths-test
   (testing "extracts test paths from deps.edn aliases"
     (let [deps {:aliases {:test {:extra-paths ["test" "test-integration"]}}}]
-      (is (= ["test" "test-integration"] (extract-test-paths deps nil)))))
+      (is (= ["test" "test-integration"] (extract-test-paths deps nil nil)))))
 
   (testing "extracts test paths from lein config"
     (let [lein-config {:test-paths ["test/unit" "test/integration"]}]
-      (is (= ["test/unit" "test/integration"] (extract-test-paths nil lein-config)))))
+      (is (= ["test/unit" "test/integration"] (extract-test-paths nil lein-config nil)))))
 
   (testing "defaults to test when no paths specified"
-    (is (= ["test"] (extract-test-paths nil {})))
-    (is (= ["test"] (extract-test-paths {} nil)))
-    (is (= ["test"] (extract-test-paths nil nil))))
+    (is (= ["test"] (extract-test-paths nil {} nil)))
+    (is (= ["test"] (extract-test-paths {} nil nil)))
+    (is (= ["test"] (extract-test-paths nil nil nil))))
 
   (testing "handles invalid test path configurations"
     (let [bad-deps {:aliases {:test {:extra-paths "not-a-vector"}}}
           bad-lein {:test-paths 123}]
-      (is (= ["test"] (extract-test-paths bad-deps nil)))
-      (is (= ["test"] (extract-test-paths nil bad-lein))))))
+      (is (= ["test"] (extract-test-paths bad-deps nil nil)))
+      (is (= ["test"] (extract-test-paths nil bad-lein nil))))))
 
 (deftest determine-project-type-test
   (testing "identifies project types correctly"
-    (is (= "deps.edn" (determine-project-type {:paths ["src"]} nil)))
-    (is (= "Leiningen" (determine-project-type nil '(defproject app "1.0.0"))))
-    (is (= "deps.edn + Leiningen" (determine-project-type {:paths ["src"]} '(defproject app "1.0.0"))))
-    (is (= "Unknown" (determine-project-type nil nil)))))
+    (is (= "deps.edn" (determine-project-type {:paths ["src"]} nil nil)))
+    (is (= "Leiningen" (determine-project-type nil '(defproject app "1.0.0") nil)))
+    (is (= "Babashka" (determine-project-type nil nil {:paths ["src"]})))
+    (is (= "deps.edn + Leiningen" (determine-project-type {:paths ["src"]} '(defproject app "1.0.0") nil)))
+    (is (= "deps.edn + Babashka" (determine-project-type {:paths ["src"]} nil {:paths ["src"]})))
+    (is (= "Leiningen + Babashka" (determine-project-type nil '(defproject app "1.0.0") {:paths ["src"]})))
+    (is (= "deps.edn + Leiningen + Babashka" (determine-project-type {:paths ["src"]} '(defproject app "1.0.0") {:paths ["src"]})))
+    (is (= "Unknown" (determine-project-type nil nil nil)))))
+
+(deftest bb-edn-parsing-test
+  (testing "parses bb.edn file correctly"
+    (let [temp-dir (Files/createTempDirectory "bb-test" (make-array java.nio.file.attribute.FileAttribute 0))
+          bb-file (io/file (.toFile temp-dir) "bb.edn")]
+      (try
+        ;; Create a test bb.edn file
+        (spit bb-file "{:paths [\"src\" \"resources\"] :deps {org.clojure/clojure {:mvn/version \"1.11.1\"}}}")
+        (let [result (read-bb-edn (.toString temp-dir))]
+          (is (map? result))
+          (is (= ["src" "resources"] (:paths result)))
+          (is (map? (:deps result))))
+        (finally
+          ;; Clean up
+          (io/delete-file bb-file true)
+          (Files/delete temp-dir)))))
+
+  (testing "returns nil when bb.edn doesn't exist"
+    (let [temp-dir (Files/createTempDirectory "bb-test-empty" (make-array java.nio.file.attribute.FileAttribute 0))]
+      (try
+        (is (nil? (read-bb-edn (.toString temp-dir))))
+        (finally
+          (Files/delete temp-dir)))))
+
+  (testing "returns nil when bb.edn is malformed"
+    (let [temp-dir (Files/createTempDirectory "bb-test-bad" (make-array java.nio.file.attribute.FileAttribute 0))
+          bb-file (io/file (.toFile temp-dir) "bb.edn")]
+      (try
+        ;; Create a malformed bb.edn file
+        (spit bb-file "{:paths [\"src\" :deps}")
+        (is (nil? (read-bb-edn (.toString temp-dir))))
+        (finally
+          ;; Clean up
+          (io/delete-file bb-file true)
+          (Files/delete temp-dir))))))
+
+(deftest extract-bb-source-paths-test
+  (testing "extracts paths from bb config"
+    (let [bb-config {:paths ["bb-src" "bb-resources"]}]
+      (is (= ["bb-src" "bb-resources"] (extract-bb-source-paths bb-config)))))
+
+  (testing "returns empty vector when no paths"
+    (let [bb-config {:deps {}}]
+      (is (= [] (extract-bb-source-paths bb-config)))))
+
+  (testing "returns empty vector when bb-config is nil"
+    (is (= [] (extract-bb-source-paths nil)))))
+
+(deftest extract-bb-tasks-test
+  (testing "extracts tasks from bb config"
+    (let [bb-config {:tasks {:test {:doc "Run tests" :task '(println "testing")}
+                             :build {:doc "Build project" :task '(println "building")}}}]
+      (is (map? (extract-bb-tasks bb-config)))
+      (is (contains? (extract-bb-tasks bb-config) :test))
+      (is (contains? (extract-bb-tasks bb-config) :build))))
+
+  (testing "returns nil when no tasks"
+    (let [bb-config {:paths ["src"]}]
+      (is (nil? (extract-bb-tasks bb-config)))))
+
+  (testing "returns nil when bb-config is nil"
+    (is (nil? (extract-bb-tasks nil)))))
 
 (deftest to-relative-path-test
   (testing "converts absolute paths to relative"

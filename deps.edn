@@ -1,5 +1,6 @@
 {:paths ["src" "resources"]
- :deps {org.clojure/data.json {:mvn/version "2.5.1"}
+ :deps {org.clojure/clojure {:mvn/version "1.12.1"}
+        org.clojure/data.json {:mvn/version "2.5.1"}
         nrepl/nrepl {:mvn/version "1.3.1"}
         org.clojure/tools.logging {:mvn/version "1.3.0"}
         org.clojure/tools.cli {:mvn/version "1.1.230"}
@@ -17,17 +18,16 @@
         org.apache.tika/tika-core {:mvn/version "3.2.0"}
         io.modelcontextprotocol.sdk/mcp {:mvn/version "0.10.0"}
 
-        dev.langchain4j/langchain4j {:mvn/version "1.0.1"}
-        dev.langchain4j/langchain4j-open-ai {:mvn/version "1.0.1"}
-        dev.langchain4j/langchain4j-anthropic {:mvn/version "1.0.1-beta6"}
-        dev.langchain4j/langchain4j-google-ai-gemini {:mvn/version "1.0.1-beta6"}
+        dev.langchain4j/langchain4j {:mvn/version "1.2.0"}
+        dev.langchain4j/langchain4j-open-ai {:mvn/version "1.2.0"}
+        dev.langchain4j/langchain4j-anthropic {:mvn/version "1.2.0"}
+        dev.langchain4j/langchain4j-google-ai-gemini {:mvn/version "1.2.0"}
 
         ;; in order to use the stdio server you have to handle logging somehow
         ;; org.slf4j/slf4j-nop {:mvn/version "2.0.16"}
 
         ;; native Java diff library
-        io.github.java-diff-utils/java-diff-utils {:mvn/version "4.15"}
-        }
+        io.github.java-diff-utils/java-diff-utils {:mvn/version "4.15"}}
  :aliases
 
  {:mcp
@@ -102,7 +102,8 @@
           :jvm-opts ["-Djdk.attach.allowAttachSelf"]
           :main-opts ["-m" "nrepl.cmdline" "--port" "7888"
                       ;; for Docker
-                      "--bind" "0.0.0.0"]}
+                      ;; "--bind" "0.0.0.0"
+                      ]}
 
   :dkr-nrepl {:extra-paths ["test" "dev"]
               :extra-deps {ch.qos.logback/logback-classic {:mvn/version "1.4.14"}}

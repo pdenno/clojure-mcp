@@ -1,0 +1,45 @@
+;; Example .clojure-mcp/config.edn showing environment variable references
+;; This allows secure configuration without hardcoding sensitive data
+
+{;; Custom model configurations with environment variable references
+ :models {;; Basic model with env var for API key
+          :openai/my-gpt {:model-name "gpt-4o"
+                          :temperature 0.7
+                          :max-tokens 4096
+                          ;; Reference environment variable for API key
+                          :api-key [:env "OPENAI_API_KEY"]}
+
+          ;; Model with both API key and base URL from environment
+          :openai/custom-endpoint {:model-name "gpt-4o"
+                                   :temperature 0.3
+                                   :api-key [:env "OPENAI_API_KEY"]
+                                   :base-url [:env "OPENAI_BASE_URL"]}
+
+          ;; Anthropic model with env var
+          :anthropic/production {:model-name "claude-3-5-sonnet-20241022"
+                                 :api-key [:env "ANTHROPIC_API_KEY"]
+                                 :max-tokens 8192
+                                 :thinking {:enabled true
+                                            :budget-tokens 4096}}
+
+          ;; Google model with nested env var usage
+          :google/gemini-prod {:model-name "gemini-2.5-pro"
+                               :api-key [:env "GEMINI_API_KEY"]
+                               :temperature 0.5
+                               :google {:project-id [:env "GOOGLE_CLOUD_PROJECT"]}}}
+
+ ;; Other configuration options
+ :allowed-directories ["."]
+ :cljfmt true
+ :bash-over-nrepl true}
+
+;; Notes:
+;; - Environment variables are always returned as strings
+;; - Use [:env "VAR_NAME"] primarily for string values like :api-key and :base-url
+;; - For numeric values, use direct values in the config
+;; 
+;; Testing Support:
+;; For unit tests, you can use the dynamic var model/*env-overrides*:
+;;   (binding [model/*env-overrides* {"TEST_API_KEY" "test-value"}]
+;;     ;; Your test code here
+;;     )

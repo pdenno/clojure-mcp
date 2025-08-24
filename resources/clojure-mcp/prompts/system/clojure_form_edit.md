@@ -50,3 +50,8 @@ Remember to include dispatch values:
 - Normal dispatch: `form_identifier: "area :rectangle"`
 - Vector dispatch: `form_identifier: "convert-length [:feet :inches]"`
 - Namespaced: `form_identifier: "tool-system/validate-inputs :clojure-eval"`
+
+
+# ALWAYS call tools with the appropriate prefix
+
+For example: if the prefix for the clojure MCP tools is `clojure-mcp` then be sure to correctly prefix the tool calls with the `clojure-mcp` prefix

@@ -3,6 +3,7 @@
   (:require
    [clojure-mcp.tool-system :as tool-system]
    [clojure-mcp.tools.file-write.core :as core]
+   [clojure-mcp.tools.agent-tool-builder.file-changes :as file-changes]
    [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.config :as config]
@@ -91,6 +92,19 @@ Before using this tool:
 
 (defmethod tool-system/execute-tool :file-write [{:keys [nrepl-client-atom]} inputs]
   (let [{:keys [file-path content]} inputs
+        ;; Capture original content - empty string for new files
+        _ (when nrepl-client-atom
+            (let [file (io/file file-path)]
+              (if (.exists file)
+                (file-changes/capture-original-content!
+                 nrepl-client-atom
+                 file-path
+                 (slurp file))
+                ;; For new files, capture empty string to show as added
+                (file-changes/capture-original-content!
+                 nrepl-client-atom
+                 file-path
+                 ""))))
         result (core/write-file nrepl-client-atom file-path content)]
     ;; Update the timestamp if write was successful and we have a client atom
     (when (and nrepl-client-atom (not (:error result)))

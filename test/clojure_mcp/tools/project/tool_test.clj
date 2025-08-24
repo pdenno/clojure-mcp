@@ -86,7 +86,7 @@
                        :sources ["/test/dir/src/test/core.clj"]}
           allowed-dirs ["/test/dir"]
           working-dir "/test/dir"
-          formatted (core/format-project-info sample-data allowed-dirs working-dir)]
+          formatted (core/format-project-info sample-data allowed-dirs working-dir :clj)]
       (is (string? formatted) "Should return a formatted string")
       (is (.contains formatted "Clojure Project Information") "Should contain project info header")
       (is (.contains formatted "Environment:") "Should contain environment section")
@@ -95,7 +95,7 @@
 (deftest integration-test-with-real-repl
   (testing "Project inspection with real REPL connection"
     ;; First directly test the inspect-project function
-    (let [direct-result (core/inspect-project @*client-atom*)]
+    (let [direct-result (core/inspect-project *client-atom*)] ; Changed from @*client-atom*
       (is (map? direct-result) "Should return a result map"))
 
     ;; Now test the full tool pipeline

@@ -186,21 +186,28 @@ Viewing tasks:
   depth: 2
   explanation: View tasks with limited nesting")
 
-(defmethod tool-system/tool-schema :scratch-pad [_]
-  {:type "object"
-   :properties {"op" {:type "string"
-                      :enum ["set_path" "get_path" "delete_path" "inspect"]
-                      :description "The operation to perform:\n * set_path: set a value at a path\n * get_path: retrieve a value at a path\n * delete_path: remove the value at the path from the data structure\n * inspect: view the datastructure (or a specific path within it) up to a certain depth\n"}
-                "path" {:type "array"
-                        :items {:type "string" #_["string" "number"]}
-                        :description "Path to the data location (array of string or number keys) - used for set_path, get_path, delete_path, and optionally inspect"}
-                "value" {:description "Value to store (for set_path). Can be ANY JSON value EXCEPT null: object, array, string, number, boolean."
-                         :type "object" #_["object" "array" "string" "number" "boolean"]}
-                "explanation" {:type "string"
-                               :description "Explanation of why this operation is being performed"}
-                "depth" {:type "number"
-                         :description "(Optional) For inspect operation: Maximum depth to display (default: 5). Must be a positive integer."}}
-   :required ["op" "explanation"]})
+(defmethod tool-system/tool-schema :scratch-pad [{:keys [nrepl-client-atom]}]
+  (let [client-hint (when nrepl-client-atom
+                      (config/get-mcp-client-hint @nrepl-client-atom))
+        claude-desktop? (= client-hint :claude-desktop)]
+    {:type "object"
+     :properties {"op" {:type "string"
+                        :enum ["set_path" "get_path" "delete_path" "inspect"]
+                        :description "The operation to perform:\n * set_path: set a value at a path\n * get_path: retrieve a value at a path\n * delete_path: remove the value at the path from the data structure\n * inspect: view the datastructure (or a specific path within it) up to a certain depth\n"}
+                  "path" {:type "array"
+                          :items (if claude-desktop?
+                                   {:type ["string" "number"]}
+                                   {:type "string"})
+                          :description "Path to the data location (array of string or number keys) - used for set_path, get_path, delete_path, and optionally inspect"}
+                  "value" {:description "Value to store (for set_path). Can be ANY JSON value EXCEPT null: object, array, string, number, boolean."
+                           :type (if claude-desktop?
+                                   ["object" "array" "string" "number" "boolean"]
+                                   "object")}
+                  "explanation" {:type "string"
+                                 :description "Explanation of why this operation is being performed"}
+                  "depth" {:type "number"
+                           :description "(Optional) For inspect operation: Maximum depth to display (default: 5). Must be a positive integer."}}
+     :required ["op" "explanation"]}))
 
 (defmethod tool-system/validate-inputs :scratch-pad [{:keys [nrepl-client-atom]} inputs]
   ;; convert set_path path nil -> delete_path path
@@ -326,6 +333,7 @@ Viewing tasks:
 ;; this is needed because of the special handling of edn in the default handler
 (defmethod tool-system/registration-map :scratch-pad [tool-config]
   {:name (tool-system/tool-name tool-config)
+   :id :scratch-pad
    :description (tool-system/tool-description tool-config)
    :schema (tool-system/tool-schema tool-config)
    :tool-fn (fn [_ params callback]
@@ -360,20 +368,22 @@ Viewing tasks:
                                                  [(:error-details data)])))]
                       (callback error-msgs true))))))})
 
-(defn create-scratch-pad-tool [nrepl-client-atom working-directory]
-  {:tool-type :scratch-pad
-   :nrepl-client-atom nrepl-client-atom
-   :working-directory working-directory})
+(defn create-scratch-pad-tool
+  [nrepl-client-atom]
+  (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)]
+    {:tool-type :scratch-pad
+     :nrepl-client-atom nrepl-client-atom
+     :working-directory working-directory}))
 
 (defn scratch-pad-tool
   "Returns the registration map for the scratch pad tool.
 
    Parameters:
-   - nrepl-client-atom: Atom containing the nREPL client
-   - working-directory: The working directory for file persistence"
-  [nrepl-client-atom working-directory]
-  ;; Check if persistence is enabled via config
-  (let [load? (config/get-scratch-pad-load @nrepl-client-atom)
+   - nrepl-client-atom: Atom containing the nREPL client"
+  [nrepl-client-atom]
+  ;; Get working directory from config
+  (let [working-directory (config/get-nrepl-user-dir @nrepl-client-atom)
+        load? (config/get-scratch-pad-load @nrepl-client-atom)
         filename (config/get-scratch-pad-file @nrepl-client-atom)]
     ;; persist by default
     ;; load by config
@@ -384,4 +394,4 @@ Viewing tasks:
           (swap! nrepl-client-atom assoc ::scratch-pad existing-data)
           (save-scratch-pad! working-directory filename {} nrepl-client-atom)))))
 
-  (tool-system/registration-map (create-scratch-pad-tool nrepl-client-atom working-directory)))
+  (tool-system/registration-map (create-scratch-pad-tool nrepl-client-atom)))

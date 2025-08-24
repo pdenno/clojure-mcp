@@ -47,7 +47,8 @@
                      (concat args ["--glob" include])
                      args)
                    (concat args ["-e" pattern path]))
-        result (apply shell/sh cmd-args)
+        result (shell/with-sh-dir path
+                 (apply shell/sh cmd-args))
         exit-code (:exit result)]
     (if (or (zero? exit-code) (= exit-code 1)) ;; 1 means no matches, which is not an error
       (let [end-time (System/currentTimeMillis)
@@ -101,7 +102,8 @@
                        (concat args [(str "--include=" include)])
                        args))
                    (concat args [pattern path]))
-        result (apply shell/sh cmd-args)
+        result (shell/with-sh-dir path
+                 (apply shell/sh cmd-args))
         exit-code (:exit result)]
     (if (or (zero? exit-code) (= exit-code 1)) ;; 1 means no matches, which is not an error
       (let [end-time (System/currentTimeMillis)

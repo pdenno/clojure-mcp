@@ -272,10 +272,7 @@
               (log/info "Started polling nREPL"))
           ;; Detect environment type early
           ;; TODO this needs to be sorted out
-          env-type (or cli-env-type
-                       (if (nrepl/clojure-env? nrepl-client-map)
-                         :clj
-                         :unknown))
+          env-type (dialects/detect-nrepl-env-type nrepl-client-map)
           nrepl-client-map-with-config (fetch-config nrepl-client-map
                                                      config-file
                                                      cli-env-type
@@ -413,10 +410,16 @@
                   (doall (make-prompts-fn nrepl-client-atom working-dir)))
         mcp (mcp-server)]
     (doseq [tool tools]
-      (add-tool mcp tool))
+      (when (config/tool-id-enabled? nrepl-client-map (:id tool))
+        (log/debug "Enabling tool:" (:id tool))
+        (add-tool mcp tool)))
     (doseq [resource resources]
-      (add-resource mcp resource))
+      (when (config/resource-name-enabled? nrepl-client-map (:name resource))
+        (log/debug "Enabling resource:" (:name resource))
+        (add-resource mcp resource)))
     (doseq [prompt prompts]
-      (add-prompt mcp prompt))
+      (when (config/prompt-name-enabled? nrepl-client-map (:name prompt))
+        (log/debug "Enabling prompt:" (:name prompt))
+        (add-prompt mcp prompt)))
     (swap! nrepl-client-atom assoc :mcp-server mcp)
     nil))

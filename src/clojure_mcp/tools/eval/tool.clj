@@ -13,7 +13,7 @@
   ([nrepl-client-atom {:keys [nrepl-session] :as config}]
    (cond-> {:tool-type ::clojure-eval
             :nrepl-client-atom nrepl-client-atom
-            :timeout 30000}
+            :timeout 20000}
      nrepl-session (assoc :session nrepl-session))))
 
 ;; Implement the required multimethods for the eval tool
@@ -50,21 +50,28 @@ Examples:
 (defmethod tool-system/tool-schema ::clojure-eval [_]
   {:type :object
    :properties {:code {:type :string
-                       :description "The Clojure code to evaluate."}}
+                       :description "The Clojure code to evaluate."}
+                :timeout_ms {:type :integer
+                             :description "Optional timeout in milliseconds for evaluation."}}
    :required [:code]})
 
 (defmethod tool-system/validate-inputs ::clojure-eval [_ inputs]
-  (let [{:keys [code]} inputs]
+  (let [{:keys [code timeout_ms]} inputs]
     (when-not code
       (throw (ex-info (str "Missing required parameter: code " (pr-str inputs))
+                      {:inputs inputs})))
+    (when (and timeout_ms (not (number? timeout_ms)))
+      (throw (ex-info (str "Error parameter must be number: timeout_ms " (pr-str inputs))
                       {:inputs inputs})))
     ;; Return validated inputs (could do more validation/coercion here)
     inputs))
 
-(defmethod tool-system/execute-tool ::clojure-eval [{:keys [nrepl-client-atom session]} inputs]
+(defmethod tool-system/execute-tool ::clojure-eval [{:keys [nrepl-client-atom session timeout]}
+                                                    {:keys [timeout_ms] :as inputs}]
   ;; Delegate to core implementation with repair
   (core/evaluate-with-repair @nrepl-client-atom (cond-> inputs
-                                                  session (assoc :session session))))
+                                                  session (assoc :session session)
+                                                  (nil? timeout_ms) (assoc :timeout_ms timeout))))
 
 (defmethod tool-system/format-results ::clojure-eval [_ {:keys [outputs error repaired] :as eval-result}]
   ;; The core implementation now returns a map with :outputs (raw outputs), :error (boolean), and :repaired (boolean)
@@ -81,7 +88,8 @@ Examples:
    (tool-system/registration-map (create-eval-tool nrepl-client-atom config))))
 
 (comment
-  ;; === Examples of using the eval tool ===
+
+;; === Examples of using the eval tool ===
   (require 'clojure-mcp.nrepl)
 
   ;; Setup for REPL-based testing
@@ -92,7 +100,7 @@ Examples:
   (def eval-tool (create-eval-tool client-atom))
 
   ;; Test the individual multimethod steps with options map
-  (def inputs {:code "(+ 1 2)"})
+  (def inputs {:code "(+ 1 2)" :timeout_ms 5000})
   (def validated (tool-system/validate-inputs eval-tool inputs))
   (def result (tool-system/execute-tool eval-tool validated))
   (def formatted (tool-system/format-results eval-tool result))

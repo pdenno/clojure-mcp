@@ -7,6 +7,7 @@
    [clojure-mcp.tools.form-edit.pipeline :as form-pipeline]
    [clojure-mcp.tools.form-edit.core :as form-edit-core]
    [clojure-mcp.tools.file-write.core :as file-write-core]
+   [clojure-mcp.tools.agent-tool-builder.file-changes :as file-changes]
    [clojure-mcp.tools.unified-read-file.file-timestamps :as file-timestamps]
    [clojure-mcp.utils.emacs-integration :as emacs]
    [clojure-mcp.config :as config]
@@ -132,6 +133,7 @@
      initial-ctx
      form-pipeline/emacs-buffer-modified-check
      form-pipeline/load-source ;; Load existing file
+     file-changes/capture-original-file-content ;; Capture original content
      form-pipeline/check-file-modified ;; Check if file modified since last read
      validate-edit ;; Validate the edit (uniqueness, etc.)
      capture-file-edit-offsets ;; Capture offsets for highlight
@@ -147,7 +149,7 @@
      form-pipeline/generate-diff ;; Generate diff between old and new
      form-pipeline/save-file ;; Save the file
      form-pipeline/update-file-timestamp ;; Update the timestamp after save
-     form-pipeline/highlight-form))) ;; Update the timestamp after save
+     form-pipeline/highlight-form))) ;; Update the timestamp after save ;; Update the timestamp after save
 
 ;; Format result for tool consumption
 (defn format-result

@@ -23,6 +23,8 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/prompts.clj`: Manages system prompts for AI assistants
 - `/src/clojure_mcp/resources.clj`: Manages resources to be exposed to AI assistants
 - `/src/clojure_mcp/config.clj`: **Enhanced** - Configuration system supporting `.clojure-mcp/config.edn` files
+  - Supports `:tools-config` for tool-specific configurations
+  - Provides `get-tool-config` and `get-tools-config` helpers
 - `/src/clojure_mcp/linting.clj`: Code quality and formatting utilities
 - `/src/clojure_mcp/sse_core.clj`: Server-Sent Events transport implementation
 - `/src/clojure_mcp/sse_main.clj`: Example SSE server using the new pattern
@@ -45,15 +47,17 @@ The project allows AI assistants to:
 - `/src/clojure_mcp/tools/grep/`: Content searching in files
 - `/src/clojure_mcp/tools/glob_files/`: Pattern-based file finding
 - `/src/clojure_mcp/tools/project/`: Project structure analysis
-- `/src/clojure_mcp/tools/code_critique/`: Code quality feedback
+- `/src/clojure_mcp/tools/agent_tool_builder/`: **NEW** - Configuration-based agent tool system
+  - `tool.clj`: Creates agent tools from configurations
+  - `core.clj`: Core functionality for building and running agents
+  - `default_agents.clj`: Default configurations for dispatch_agent, architect, code_critique, and clojure_edit_agent
+  - `file_changes.clj`: Tracks file changes for agent operations
 - `/src/clojure_mcp/tools/think/`: Reflective thinking tool for AI assistants
 - `/src/clojure_mcp/tools/bash/`: Shell command execution
   - **NEW**: Uses a separate nREPL session for isolation
   - Each bash tool instance creates its own session on initialization
   - Commands execute in an isolated environment from the main REPL
   - Supports both nREPL and local execution modes via config
-- `/src/clojure_mcp/tools/dispatch_agent/`: Agent dispatching for complex tasks
-- `/src/clojure_mcp/tools/architect/`: Technical planning and architecture assistance
 - `/src/clojure_mcp/tools/scratch_pad/`: Persistent scratch pad for inter-tool communication
   - `core.clj`: Core functionality for data storage and retrieval
   - `tool.clj`: MCP integration with path-based operations (set_path, get_path, delete_path)
@@ -84,8 +88,18 @@ All unused tools have corresponding test files moved to `/test/clojure_mcp/other
 - `/resources/prompts/`: System prompts for AI assistants
 - `/resources/prompts/system/`: Core system prompts
 - `/resources/agent/`: Agent-specific resources
-- `/resources/configs/`: Configuration examples
 - `/resources/logback.xml`: Logging configuration file
+
+### Documentation
+
+- `/doc/README.md`: Documentation overview
+- `/doc/custom-mcp-server.md`: Guide for creating custom MCP servers
+- `/doc/model-configuration.md`: Guide for configuring custom LLM models
+- `/doc/creating-tools-multimethod.md`: Guide for creating tools with multimethods
+- `/doc/creating-tools-without-clojuremcp.md`: Guide for creating standalone tools
+- `/doc/creating-prompts.md`: Guide for creating custom prompts
+- `/doc/creating-resources.md`: Guide for creating custom resources
+- `/doc/gen-your-mcp-server.md`: Guide for generating MCP servers
 
 ## Dependencies and Versions
 
@@ -131,9 +145,9 @@ your-project/
 ### Configuration Options
 - `allowed-directories`: Controls which directories MCP tools can access (security)
 - `emacs-notify`: Boolean flag for Emacs integration
-- `write-file-guard`: Controls file timestamp tracking behavior (default: `:full-read`)
-  - `:full-read` - Only full reads update timestamps (safest, default)
-  - `:partial-read` - Both full and collapsed reads update timestamps
+- `write-file-guard`: Controls file timestamp tracking behavior (default: `:partial-read`)
+  - `:partial-read` - Both full and collapsed reads update timestamps (default)
+  - `:full-read` - Only full reads update timestamps (safest)
   - `false` - Disables timestamp checking entirely
 - `cljfmt`: Boolean flag to enable/disable cljfmt formatting in editing pipelines (default: `true`)
   - `true` - Applies cljfmt formatting to edited files (default behavior)
@@ -147,16 +161,72 @@ your-project/
 - `scratch-pad-file`: Filename for scratch pad persistence (default: `"scratch_pad.edn"`)
   - Specifies the filename within `.clojure-mcp/` directory
   - Only used when `scratch-pad-load` is `true`
+- `enable-tools`: List of tool IDs to enable (default: `nil` - all tools enabled)
+  - When provided, only tools in this list are enabled
+  - Empty list `[]` disables all tools
+  - Tool IDs can be keywords or strings (e.g., `:clojure-eval` or `"clojure-eval"`)
+- `disable-tools`: List of tool IDs to disable (default: `nil` - no tools disabled)
+  - Applied after `enable-tools` filtering
+  - Useful for excluding specific tools while keeping most enabled
+  - Tool IDs can be keywords or strings
+- `enable-prompts`: List of prompt names to enable (default: `nil` - all prompts enabled)
+  - When provided, only prompts in this list are enabled
+  - Empty list `[]` disables all prompts
+  - Prompt names must be strings (e.g., `"chat-session-summarize"` or `"clojure_repl_system_prompt"`)
+- `disable-prompts`: List of prompt names to disable (default: `nil` - no prompts disabled)
+  - Applied after `enable-prompts` filtering
+  - Useful for excluding specific prompts while keeping most enabled
+  - Prompt names must be strings
+- `enable-resources`: List of resource names to enable (default: `nil` - all resources enabled)
+  - When provided, only resources in this list are enabled
+  - Empty list `[]` disables all resources
+  - Resource names must be strings (e.g., `"PROJECT_SUMMARY.md"` or `"README.md"`)
+- `disable-resources`: List of resource names to disable (default: `nil` - no resources disabled)
+  - Applied after `enable-resources` filtering
+  - Useful for excluding specific resources while keeping most enabled
+  - Resource names must be strings
+- `models`: Map of custom model configurations (default: `{}`)
+  - Define named model configurations for LangChain4j integration
+  - Keys are namespaced keywords like `:openai/my-gpt4` or `:anthropic/my-claude`
+  - Values are configuration maps with model parameters
+  - Supports environment variable references: `{:api-key [:env "OPENAI_API_KEY"]}`
+  - Falls back to built-in defaults if custom model not found
+- `tools-config`: Map of tool-specific configurations (default: `{}`)
+  - Configure individual tools with custom settings
+  - Keys are tool IDs as keywords (e.g., `:dispatch_agent`, `:architect`)
+  - Values are configuration maps specific to each tool
+  - Example: `:dispatch_agent {:model :openai/o3}` to use a custom model
 
 ### Example Configuration
 ```edn
 {:allowed-directories ["." "src" "test" "resources" "../sibling-project"]
  :emacs-notify false
- :write-file-guard :full-read
+ :write-file-guard :partial-read
  :cljfmt true
  :bash-over-nrepl true
  :scratch-pad-load false
- :scratch-pad-file "scratch_pad.edn"}
+ :scratch-pad-file "scratch_pad.edn"
+ :enable-tools [:clojure-eval :read-file :file-write :grep :glob-files]
+ :disable-tools [:dispatch-agent :architect]
+ :enable-prompts ["clojure_repl_system_prompt" "chat-session-summarize"]
+ :disable-prompts ["scratch-pad-save-as"]
+ :enable-resources ["PROJECT_SUMMARY.md" "README.md"]
+ :disable-resources ["CLAUDE.md" "LLM_CODE_STYLE.md"]
+ :tools-config {:dispatch_agent {:model :openai/o3}
+                :architect {:model :anthropic/claude-3-haiku-20240307}}
+ :models {:openai/my-fast {:model-name "gpt-4o"
+                           :temperature 0.3
+                           :max-tokens 2048
+                           ;; Reference environment variable
+                           :api-key [:env "OPENAI_API_KEY"]}
+          :openai/o3 {:model-name "o3-mini"
+                      :temperature 0.2
+                      :api-key [:env "OPENAI_API_KEY"]}
+          :anthropic/my-reasoning {:model-name "claude-3-5-sonnet-20241022"
+                                   :thinking {:enabled true
+                                             :budget-tokens 4096}
+                                   ;; Direct value (not recommended for production)
+                                   :api-key "sk-ant-..."}}}
 ```
 
 ### Path Resolution and Security
@@ -201,19 +271,22 @@ The following tools are available in the default configuration (`main.clj`):
 |-----------|-------------|---------------|
 | `clojure_inspect_project` | Analyzes and provides detailed information about a Clojure project's structure | Understanding project organization, dependencies |
 
-### Agent Tools (Require API Keys)
+### Agent Tools (Configuration-Based)
+
+Default agent tools are automatically created through the agent-tool-builder system. These can be customized via `:tools-config` or completely replaced via `:agents` configuration:
 
 | Tool Name | Description | Example Usage |
 |-----------|-------------|---------------|
 | `dispatch_agent` | Launch a new agent that has access to read-only tools | Multi-step file exploration and analysis |
 | `architect` | Your go-to tool for any technical or coding task | System design, architecture decisions |
+| `code_critique` | Provides constructive feedback on Clojure code | Iterative code quality improvement |
+| `clojure_edit_agent` | Efficiently applies multiple code changes | Structural editing of multiple files |
 
 ### Experimental Tools
 
 | Tool Name | Description | Example Usage |
 |-----------|-------------|---------------|
 | `scratch_pad` | A persistent scratch pad for storing structured data between tool calls | Task tracking, intermediate results, inter-agent communication |
-| `code_critique` | Starts an interactive code review conversation that provides constructive feedback on your Clojure code | Iterative code quality improvement |
 
 ## Tool Examples
 
@@ -456,6 +529,21 @@ See `/doc/custom-mcp-server.md` for comprehensive documentation on creating cust
    - See `sse-main.clj` for an example implementation
 
 ## Recent Organizational Changes
+
+**Agent Tools Refactoring**: Replaced individual hardcoded agent tools with a configuration-based system:
+- Agent tools (dispatch_agent, architect, code_critique, clojure_edit_agent) now created through agent-tool-builder
+- Default agents automatically available but can be customized via `:tools-config`
+- Users can override defaults completely via `:agents` configuration
+- Merges tool-specific configurations from `:tools-config` into default agents
+- Removed 600+ lines of redundant code while maintaining backward compatibility
+
+**Model Configuration Support**: Added support for user-defined model configurations via `.clojure-mcp/config.edn`:
+- Users can define custom named model configurations under the `:models` key
+- New `create-model-builder-from-config` and `create-model-from-config` functions use nrepl-client-map to access user configs
+- Falls back to built-in defaults when custom models aren't found
+- Supports environment variable references with `[:env "VAR_NAME"]` syntax for secure API key configuration
+- Supports all existing validation and model parameters
+- Example: `:models {:openai/my-fast {:model-name "gpt-4o" :temperature 0.3 :api-key [:env "OPENAI_API_KEY"]}}`
 
 **New Factory Function Pattern**: The project has been refactored to use a cleaner pattern for creating custom MCP servers:
 - Factory functions (`make-tools`, `make-prompts`, `make-resources`) with consistent signatures

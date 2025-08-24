@@ -26,7 +26,7 @@
                           :docstring-no-summary
                           :docstring-leading-trailing-whitespace
                           :file
-                          #_:reduce-without-init
+                          :reduce-without-init
                           :line-length
                           :missing-docstring
                           :namespace-name-mismatch

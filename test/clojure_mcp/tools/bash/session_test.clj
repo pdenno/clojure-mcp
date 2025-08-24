@@ -57,7 +57,8 @@
 
         ;; Execute a bash command
         (let [inputs {:command "echo test"
-                      :working-directory (System/getProperty "user.dir")}
+                      :working-directory (System/getProperty "user.dir")
+                      :timeout-ms 30000}
               result (tool-system/execute-tool bash-tool-config inputs)]
 
           ;; Verify the session was passed to evaluate-code

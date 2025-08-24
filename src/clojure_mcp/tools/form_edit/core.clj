@@ -3,15 +3,13 @@
    This namespace contains the pure functionality for manipulating Clojure forms
    without any MCP-specific code."
   (:require
-   [rewrite-clj.zip :as z]
-   [rewrite-clj.parser :as p]
-   [rewrite-clj.node :as n]
-   [rewrite-clj.paredit :as par]
-   [cljfmt.core :as fmt]
    [cljfmt.config :as cljfmt-config]
+   [cljfmt.core :as fmt]
    [clojure-mcp.config :as config]
    [clojure.string :as str]
-   [clojure.java.io :as io]))
+   [rewrite-clj.node :as n]
+   [rewrite-clj.parser :as p]
+   [rewrite-clj.zip :as z]))
 
 ;; Form identification and location functions
 
@@ -50,11 +48,21 @@
   (when (and dispatch-elem expected-dispatch)
     (= (get-node-string dispatch-elem) expected-dispatch)))
 
+(defn tag-match?
+  "Determine if the actual tag matches the expected tag.
+
+  Matches both public and private definition forms, allowing `def` to match
+  `def-` and `defn` to match `defn-`."
+  [expected actual]
+  (or (= actual expected)
+      (= actual (str expected "-"))))
+
 (defn check-tag
   "Check if the first element matches the expected tag."
   [first-elem tag]
-  (when (= (str/trim (n/string (z/node first-elem))) tag)
-    first-elem))
+  (let [actual (str/trim (n/string (z/node first-elem)))]
+    (when (tag-match? tag actual)
+      first-elem)))
 
 (defn check-method-and-dispatch
   "Check if method name and optionally dispatch value match the expected patterns."
@@ -124,7 +132,7 @@
                        ;; Check for forms where the tag's unqualified name matches our tag
                        (when (and (symbol? form-tag)
                                   (symbol? form-name)
-                                  (= (name form-tag) tag) ;; Tag's name part matches our tag
+                                  (tag-match? tag (name form-tag)) ;; Tag matches expected (public or private)
                                   (= (name form-name) dname)) ;; Form name's name part matches our name
                          (swap! similar-matches conj
                                 {:form-name dname
@@ -165,6 +173,39 @@
 
 ;; Form editing operations
 
+(defn walk-back-to-non-comment [zloc]
+  (z/find-next zloc z/prev*
+               (fn [zloc]
+                 (not (#{:whitespace :comment} (n/tag (z/node zloc)))))))
+
+(defn remove-consecutive-comments [zloc]
+  (if (n/whitespace-or-comment? (z/node zloc))
+    (remove-consecutive-comments
+     (-> zloc
+         z/remove*
+         z/next*))
+    zloc))
+
+(defn replace-top-level-form
+  "function replacement with special handling for leading comments"
+  [form-zloc content-str]
+  (if (-> content-str str/trim (str/starts-with? ";"))
+    (-> form-zloc
+        walk-back-to-non-comment
+        z/next*
+        remove-consecutive-comments
+        (z/replace (p/parse-string-all content-str)))
+    (z/replace form-zloc (p/parse-string-all content-str))))
+
+(defn insert-before-top-level-form [zloc content-str]
+  (-> zloc
+      walk-back-to-non-comment
+      z/next*
+      (z/insert-left* (p/parse-string-all "\n\n"))
+      z/left
+      (z/insert-left* (p/parse-string-all content-str))
+      z/left))
+
 (defn edit-top-level-form
   "Edit a top-level form by replacing it or inserting content before or after.
    
@@ -187,17 +228,12 @@
        find-result ;; Return the result with nil :zloc and any similar-matches
        (let [updated-zloc
              (case edit-type
-               :replace (z/replace form-zloc (p/parse-string-all content-str))
-               ;; it would be nice if this handled comments immediately preceeding the form
-               :before (-> form-zloc
-                           (z/insert-left (p/parse-string-all "\n\n"))
-                           z/left
-                           (z/insert-left (p/parse-string-all content-str))
-                           z/left)
+               :replace (replace-top-level-form form-zloc content-str)
+               :before (insert-before-top-level-form form-zloc content-str)
                :after (-> form-zloc
-                          (z/insert-right (p/parse-string-all "\n\n"))
+                          (z/insert-right* (p/parse-string-all "\n\n"))
                           z/right
-                          (z/insert-right (p/parse-string-all content-str))
+                          (z/insert-right* (p/parse-string-all content-str))
                           z/right))]
          {:zloc updated-zloc
           :similar-matches (:similar-matches find-result)})))))
@@ -445,11 +481,15 @@
   (try
     (let [sexpr (z/sexpr zloc)]
       (when (and (seq? sexpr) (symbol? (first sexpr)))
-        (let [form-type (name (first sexpr))
+        (let [form-sym (first sexpr)
+              form-type (name form-sym)
+              base-type (if (str/ends-with? form-type "-")
+                          (subs form-type 0 (dec (count form-type)))
+                          form-type)
               form-name (extract-form-name sexpr)]
 
-          (case form-type
-            "defn" (let [zloc-down (z/down zloc) ; Move to the symbol "defn"
+          (case base-type
+            "defn" (let [zloc-down (z/down zloc) ; Move to the symbol (defn/defn-)
                          name-loc (and zloc-down (z/right zloc-down)) ; Move to name
                          maybe-docstring (and name-loc (z/right name-loc)) ; Next node after name
                          args-loc (if (and maybe-docstring
@@ -458,10 +498,10 @@
                                     (z/right maybe-docstring) ; Skip docstring to find args
                                     maybe-docstring)] ; No docstring, args right after name
                      (if (and args-loc (= (z/tag args-loc) :vector))
-                       (str "(defn " form-name " " (z/string args-loc) " ...)")
-                       (str "(defn " form-name " [...] ...)")))
+                       (str "(" form-type " " form-name " " (z/string args-loc) " ...)")
+                       (str "(" form-type " " form-name " [...] ...)")))
 
-            "defmacro" (let [zloc-down (z/down zloc) ; Move to the symbol "defmacro"
+            "defmacro" (let [zloc-down (z/down zloc) ; Move to the symbol (defmacro/defmacro-)
                              name-loc (and zloc-down (z/right zloc-down)) ; Move to name
                              maybe-docstring (and name-loc (z/right name-loc)) ; Next node after name
                              args-loc (if (and maybe-docstring
@@ -470,8 +510,8 @@
                                         (z/right maybe-docstring) ; Skip docstring to find args
                                         maybe-docstring)] ; No docstring, args right after name
                          (if (and args-loc (= (z/tag args-loc) :vector))
-                           (str "(defmacro " form-name " " (z/string args-loc) " ...)")
-                           (str "(defmacro " form-name " [...] ...)")))
+                           (str "(" form-type " " form-name " " (z/string args-loc) " ...)")
+                           (str "(" form-type " " form-name " [...] ...)")))
 
             "defmethod" (let [zloc-down (z/down zloc) ; Move to the symbol "defmethod"
                               method-loc (and zloc-down (z/right zloc-down)) ; Move to method name
@@ -491,11 +531,11 @@
                                            (= (z/tag loc) :vector) loc
                                            :else (recur (z/right loc))))]
                           (if (and args-loc (= (z/tag args-loc) :vector))
-                            (str "(defmethod " method-name " " dispatch-str " " (z/string args-loc) " ...)")
-                            (str "(defmethod " method-name " " dispatch-str " [...] ...)")))
+                            (str "(" form-type " " method-name " " dispatch-str " " (z/string args-loc) " ...)")
+                            (str "(" form-type " " method-name " " dispatch-str " [...] ...)")))
 
-            "def" (str "(def " form-name " ...)")
-            "deftest" (str "(deftest " form-name " ...)")
+            "def" (str "(" form-type " " form-name " ...)")
+            "deftest" (str "(" form-type " " form-name " ...)")
             "ns" (z/string zloc) ; Always show the full namespace
             (str "(" form-type " " (or form-name "") " ...)")))))
     (catch Exception e
@@ -651,12 +691,16 @@
           [method-name dispatch-str])))
     (catch Exception _ nil)))
 
-;; multi sexp editing
+;; REPLACE MULTIPLE SEXPS
+
+(def ^:dynamic *match-clean* false)
 
 (defn semantic-nodes?
   "Returns true if node contributes to program semantics"
   [node]
-  (not (#{:comment :uneval :whitespace :newline :comma} (n/tag node))))
+  (if *match-clean*
+    (not (n/whitespace-or-comment? node))
+    (not (n/whitespace? node))))
 
 (defn normalize-whitespace-node
   "Normalize whitespace within a node while preserving structure"
@@ -666,7 +710,7 @@
     (if (n/inner? node)
       (let [children (n/children node)
             filtered (->> children
-                          (remove #(#{:whitespace :newline :comma} (n/tag %)))
+                          (remove n/whitespace?)
                           (map normalize-whitespace-node)
                           (interpose (n/spaces 1))
                           vec)]
@@ -699,7 +743,11 @@
     ;; Leaf nodes pass through
     :else node))
 
-(def ^:dynamic *match-clean* false)
+(defn node->match-expr [node]
+  (when-let [n (if *match-clean*
+                 (normalize-and-clean-node node)
+                 (normalize-whitespace-node node))]
+    (n/string n)))
 
 (defn zchild-match-exprs
   "Extract expressions for pattern matching.
@@ -716,31 +764,17 @@
    Example:
    (zchild-match-exprs (z/of-string* \";; TODO\\n(defn foo [x] x)\"))
    => (\";; TODO\\n\" \"(defn foo [x] x)\")"
-  ([zloc]
-   (zchild-match-exprs zloc {:clean? *match-clean*}))
-  ([zloc {:keys [clean?] :or {clean? false}}]
-   (let [nodes (if (= :forms (z/tag zloc))
+  [zloc]
+  (let [nodes (if (= :forms (z/tag zloc))
                  ;; If at forms node, get children
-                 (n/children (z/node zloc))
+                (n/children (z/node zloc))
                  ;; Otherwise iterate through siblings
-                 (->> (iterate z/right* zloc)
-                      (take-while some?)
-                      (map z/node)))]
-     (->> nodes
-          (filter (fn [node]
-                    (let [tag (n/tag node)]
-                      (or (semantic-nodes? node)
-                          (and (not clean?)
-                               (or (= :comment tag)
-                                   (= :uneval tag)))))))
-          (map (fn [node]
-                 (if (semantic-nodes? node)
-                   (-> ((if clean?
-                          normalize-and-clean-node
-                          normalize-whitespace-node)
-                        node)
-                       n/string)
-                   (n/string node))))))))
+                (->> (iterate z/right* zloc)
+                     (take-while some?)
+                     (map z/node)))]
+    (->> nodes
+         (filter (bound-fn* semantic-nodes?))
+         (keep (bound-fn* node->match-expr)))))
 
 (defn str-forms->sexps [str-forms]
   (zchild-match-exprs (z/of-node (p/parse-string-all str-forms))))
@@ -757,56 +791,80 @@
        (take n)
        last))
 
-(defn kill-n-sexps [n zloc]
-  ;; zloc on first item to remove
-  ;; calling z/next after this should get you to the next position
-  (-> zloc
-      (z/insert-left (p/parse-string "(__clojure-mcp-edit-marker__)"))
-      z/prev ;; inside added node
-      ;; then slurp into the node
-      (as-> z (nth (iterate par/slurp-forward z) n))
-      #_(as-> z (iterate-to-n par/slurp-forward z (inc n)))
-      z/up
-      z/remove-preserve-newline))
-
-(defn zleft-n [zloc n]
-  (iterate-to-n z/left zloc n))
-
 (defn zright-n [zloc n]
   (iterate-to-n z/right zloc n))
 
-(defn count-forms-to-kill [start-zloc match-count]
-  (if *match-clean*
-    ;; Count non-whitespace forms until we've seen all semantic matches
-    (loop [loc start-zloc
-           semantic-seen 1
-           total-count 1]
-      (if (>= semantic-seen match-count)
-        total-count
-        (if-let [next-loc (z/right loc)] ; z/right skips whitespace
-          (let [semantic? (and (z/sexpr-able? next-loc)
-                               (semantic-nodes? (z/node next-loc)))]
-            (recur next-loc
-                   (if semantic? (inc semantic-seen) semantic-seen)
-                   (inc total-count)))
-          total-count)))
-    match-count))
+;; the given zloc should be add the start of the value to be replaced
+;;
 
-;; TODO probably dont need special handing for empty replacement
-(defn replace-multi [zloc match-sexprs replacement-node]
-  (let [kill-count (count-forms-to-kill zloc (count match-sexprs))]
-    (if (nil? replacement-node)
-      (let [after-loc (kill-n-sexps kill-count zloc)]
-        {:edit-span-loc after-loc
-         :after-loc after-loc})
-      (let [after-insert (z/insert-left zloc replacement-node)
-            after-loc (->> after-insert ;; could left and splice
-                           (kill-n-sexps kill-count))]
-        {:edit-span-loc (-> after-insert z/left)
-         :after-loc after-loc}))))
+;; TRUNCATION
+;; the key to replacing a multi-sexp expression is to truncate it down to
+;; its first expression deleting all the other matched nodes
+;; then it's just a normal replace edit after that
+
+(defn remove-match-expr [zloc match-exp]
+  (loop [zloc' zloc]
+    (when (and zloc'
+               (not (z/end? zloc')))
+      (let [node (z/node zloc')]
+        ;; if this is a semantic node and not a match then this
+        ;; shoudn't occur as this function should only be called when
+        ;; the next expression should be match-exp
+        (when (and (semantic-nodes? node)
+                   (not= match-exp (node->match-expr node)))
+          (throw (ex-info "Bad match state" {:node (n/string node)
+                                             :match-exp match-exp})))
+        (if (and
+             (semantic-nodes? node)
+             (= match-exp (node->match-expr node)))
+          (z/remove* zloc')
+          (recur (-> zloc' z/remove* z/next*)))))))
+
+(defn remove-match-exprs [zloc match-exprs]
+  (let [end (last match-exprs)]
+    (reduce
+     (fn [zloc' match-expr]
+       (let [zl (remove-match-expr zloc' match-expr)]
+         (cond
+           (= match-expr end) zl
+           (not (z/end? zl)) (z/next* zl))))
+     zloc
+     match-exprs)))
+
+(defn truncate-matched-expression [zloc [start & match-exprs]]
+  (when-let [after-truncated (remove-match-exprs
+                              (z/right* zloc)
+                              match-exprs)]
+    ;; find the start node
+    (z/find after-truncated
+            z/prev*
+            (fn [zloc]
+              (let [node (z/node zloc)]
+                (and
+                 (semantic-nodes? node)
+                 (= start (node->match-expr node))))))))
+
+(defn replace-multi-helper [zloc match-exprs content-str]
+  (if (= 1 (count match-exprs))
+    (replace-top-level-form zloc content-str)
+    (let [truncated-zloc (truncate-matched-expression zloc match-exprs)]
+      (replace-top-level-form truncated-zloc content-str))))
+
+(defn replace-multi [zloc match-sexprs content-str]
+  (if (or (nil? content-str) (zero? (count content-str)))
+    (let [after-loc (remove-match-exprs zloc match-sexprs)]
+      {:edit-span-loc after-loc
+       :after-loc after-loc})
+    (let [edit-span-loc (replace-multi-helper zloc match-sexprs content-str)]
+      {:edit-span-loc edit-span-loc
+       :after-loc (or (z/right edit-span-loc)
+                      (z/next edit-span-loc))})))
 
 (defn insert-before-multi [zloc match-sexprs replacement-node]
-  (let [edit-loc (-> (z/insert-left zloc replacement-node)
+  (let [edit-loc (-> zloc
+                     walk-back-to-non-comment
+                     z/next*
+                     (z/insert-left replacement-node)
                      z/left)]
     {:edit-span-loc edit-loc
      :after-loc (-> edit-loc
@@ -840,7 +898,7 @@
         (condp = operation
           :insert-before (insert-before-multi found-loc match-sexprs new-node)
           :insert-after (insert-after-multi found-loc match-sexprs new-node)
-          (replace-multi found-loc match-sexprs new-node))))))
+          (replace-multi found-loc match-sexprs new-form))))))
 
 (defn find-and-edit-all-multi-sexp [zloc operation match-form new-form]
   {:pre [(#{:insert-before :insert-after :replace} operation) zloc (string? match-form) (string? new-form)]}
@@ -872,6 +930,68 @@
 
 (comment
 
+  ;; NEW replace-multi ALOGORITHM
+  ;; identify location
+  ;; move after location with z/right*
+  ;; delete all nodes with z/remove* z/next* upto and including last match of multimatch
+  ;; use find-next prev* to find initial node before editing
+  ;; then we replace that found node (optionally walking back before comments if the replacement starts with comments)
+
+  (let [source "(defn test-fn [x] (+ x 1) #(+ % 2) 
+
+(+ 2 3))"
+        source-z (z/of-string source)
+        match "(+ x 1) #(+ % 2) (+ 2 3)"
+        replace "(inc x)"
+
+        norm-matches (zchild-match-exprs (z/of-string match))
+        last-match (last norm-matches)
+        zloc-of-found-exp ;; here we are at the matching first expression (+ x 1)
+        (-> source-z
+            z/next
+            z/next
+            z/next
+            z/right)
+        zloc-after-found-exp ;; here we are right after the first expresssion
+        (-> zloc-of-found-exp ;; here we are at the matching first expression (+ x 1)
+            z/right*
+
+            ;; alg 
+
+            ;; one last removal
+            ;; z/remove* 
+            #_z/root-string)
+        zloc-of-last
+        (->
+         zloc-after-found-exp
+         z/remove*
+         z/next*
+         z/remove*
+         z/next*
+         z/remove*
+         z/next*
+         z/remove*
+         z/next* ;; here we are at the node that will match the last node (+ 2 3)
+         z/remove*
+         ;; and then we find the first expression and that will be our zlocation
+         ;; to do a replacement on that first expression
+         )]
+    (z/root-string zloc-of-last)
+    #_(z/root-string
+       (z/edit->
+        zloc-of-found-exp
+        ((fn [zloc]
+           (loop [zloc' (z/right* zloc)]
+             (if (= last-match (first (zchild-match-exprs zloc')))
+               (z/remove* zloc')
+               (recur (-> zloc'
+                          z/remove*
+                          z/next*))))))))
+
+    #_zloc-of-last
+    #_(= last-match
+         (first (zchild-match-exprs zloc-of-last))))
+
   (let [source "(defn test-fn [x] (+ x 1) (+ x 2))"
         zloc (z/of-string source)
         result (find-and-edit-multi-sexp zloc "(+ x 1) (+ x 2)" "(inc x)" {:operation :replace})
@@ -886,7 +1006,21 @@
       :zloc
       z/root-string)
 
-  (-> (z/of-string "(+ x 1) (+ x 2)"))
+  (-> (z/of-string ";;asdfaasdf
+;asfdasdf
+(+ x 1) 
+;asdfasfdas
+;;asdfasdf
+(+ x 2) 
+;asdfasfdas
+;;asdfasdf
+(+ x 2)
+")
+      z/right
+      walk-back-to-non-comment
+      z/next*
+      z/remove
+      z/root-string)
 
   (let [new-node (p/parse-string-all "(inc x) (+ x 10)")]
     (-> (find-multi-sexp
@@ -910,7 +1044,11 @@
   (def test-content (str "(ns test.core)\n\n"
                          "(defn example-fn [x y]\n"
                          "  #_(println \"debug value:\" x)\n"
-                         "  (+ x y)\n"
+                         "  (+ x 
+
+
+
+y)\n"
                          "  (+ x 1)\n"
                          "  (- y 1))\n\n"
                          "(defn another-fn [z]\n"
@@ -929,14 +1067,25 @@
   (def debug-zloc (z/of-node (p/parse-string-all test-content)))
 
   (-> (find-and-edit-multi-sexp
+       (z/of-string "(let [a\t\t1\n      b  2] (+ a b))"
+                    #_{:track-position? true})
+       "a 1 b 2"
+       "x 10 y 20"
+       {:operation :replace
+        :all? false})
+      #_:zloc
+      #_z/root-string
+      #_println)
+
+  (-> (find-and-edit-multi-sexp
        debug-zloc
        "(+ x y)"
        "(+ xxx yyx)"
        {:operation :replace
-        :all? false})
+        :all? true})
       :zloc
       z/root-string
-      println)
+      #_println)
 
   (-> (find-and-edit-multi-sexp
        (z/of-string "#_1 2")

@@ -1,7 +1,8 @@
 (ns clojure-mcp.config
   (:require
    [clojure.java.io :as io]
-   [clojure-mcp.nrepl :as nrepl]
+   [clojure.string :as str]
+   [clojure-mcp.dialects :as dialects]
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]))
 
@@ -21,7 +22,7 @@
     (when (some? write-file-guard)
       (when-not (contains? #{:full-read :partial-read false} write-file-guard)
         (log/warn "Invalid write-file-guard value:" write-file-guard
-                  "- using default :full-read")
+                  "- using default :partial-read")
         (throw (ex-info (str "Invalid Config: write-file-guard value:  " write-file-guard
                              "- must be one of (:full-read, :partial-read, false)")
                         {:write-file-guard write-file-guard}))))
@@ -82,25 +83,16 @@
 
 (defn get-write-file-guard [nrepl-client-map]
   (let [value (get-config nrepl-client-map :write-file-guard)]
-    ;; Validate the value and default to :full-read if invalid
+    ;; Validate the value and default to :partial-read if invalid
     (cond
       ;; nil means not configured, use default
-      (nil? value) :full-read
+      (nil? value) :partial-read
       ;; Valid values (including false)
       (contains? #{:full-read :partial-read false} value) value
       ;; Invalid values
       :else (do
-              (log/warn "Invalid write-file-guard value:" value "- using default :full-read")
-              :full-read))))
-
-(defn get-bash-over-nrepl
-  "Returns whether bash commands should be executed over nREPL.
-   Defaults to true for compatibility."
-  [nrepl-client-map]
-  (let [value (get-config nrepl-client-map :bash-over-nrepl)]
-    (if (nil? value)
-      true ; Default to true when not specified
-      (boolean value))))
+              (log/warn "Invalid write-file-guard value:" value "- using default :partial-read")
+              :partial-read))))
 
 (defn get-nrepl-env-type
   "Returns the nREPL environment type.
@@ -110,6 +102,19 @@
     (if (nil? value)
       :clj ; Default to :clj when not specified
       value)))
+
+(defn get-bash-over-nrepl
+  "Returns whether bash commands should be executed over nREPL.
+   Defaults to true for compatibility."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :bash-over-nrepl)
+        nrepl-env-type (get-nrepl-env-type nrepl-client-map)]
+    ;; XXX hack so that bash still works in other environments
+    (if (nil? value)
+      ;; default to the capability
+      (dialects/handle-bash-over-nrepl? nrepl-env-type)
+      ;; respect configured value
+      (boolean value))))
 
 (defn clojure-env?
   "Returns true if the nREPL environment is a Clojure environment."
@@ -128,7 +133,7 @@
   [nrepl-client-map]
   (let [value (get-config nrepl-client-map :scratch-pad-load)]
     (if (nil? value)
-      false                      ; Default to false when not specified
+      false ; Default to false when not specified
       (boolean value))))
 
 (defn get-scratch-pad-file
@@ -139,6 +144,198 @@
     (if (nil? value)
       "scratch_pad.edn" ; Default filename
       value)))
+
+(defn get-models
+  "Returns the models configuration map.
+   Defaults to empty map when not specified."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :models)]
+    (if (nil? value)
+      {} ; Default to empty map
+      value)))
+
+(defn get-tools-config
+  "Returns the tools configuration map.
+   Defaults to empty map when not specified."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :tools-config)]
+    (if (nil? value)
+      {} ; Default to empty map
+      value)))
+
+(defn get-tool-config
+  "Returns configuration for a specific tool.
+   Tool ID can be a keyword or string.
+   Returns nil if no configuration exists for the tool."
+  [nrepl-client-map tool-id]
+  (let [tools-config (get-tools-config nrepl-client-map)
+        ;; Normalize tool-id to keyword
+        tool-key (keyword tool-id)]
+    (get tools-config tool-key)))
+
+(defn get-agents-config
+  "Returns the agents configuration vector.
+   Defaults to empty vector when not specified."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :agents)]
+    (if (nil? value)
+      []
+      value)))
+
+(defn get-agent-config
+  "Returns configuration for a specific agent by ID.
+   Agent ID can be a keyword or string.
+   Returns nil if no agent with that ID exists."
+  [nrepl-client-map agent-id]
+  (let [agents (get-agents-config nrepl-client-map)
+        ;; Normalize agent-id to keyword
+        agent-key (keyword agent-id)]
+    (first (filter #(= (:id %) agent-key) agents))))
+
+(defn get-mcp-client-hint [nrepl-client-map]
+  (get-config nrepl-client-map :mcp-client))
+
+(defn get-dispatch-agent-context
+  "Returns dispatch agent context configuration.
+   Can be:
+   - true/false (boolean) - whether to use default code index
+   - list of file paths - specific files to load into context
+   Defaults to true for backward compatibility."
+  [nrepl-client-map]
+  (let [value (get-config nrepl-client-map :dispatch-agent-context)
+        user-dir (get-nrepl-user-dir nrepl-client-map)]
+    (cond
+      (nil? value)
+      true ;; Default to true to maintain existing behavior
+
+      (boolean? value)
+      value
+
+      (sequential? value)
+      ;; Process file paths
+      (->> value
+           (map (fn [path]
+                  (let [file (io/file path)]
+                    (if (.isAbsolute file)
+                      (.getCanonicalPath file)
+                      (.getCanonicalPath (io/file user-dir path))))))
+           (filter #(.exists (io/file %)))
+           vec)
+
+      :else
+      (do
+        (log/warn "Invalid :dispatch-agent-context value, defaulting to true")
+        true))))
+
+(defn get-enable-tools [nrepl-client-map]
+  (get-config nrepl-client-map :enable-tools))
+
+(defn get-disable-tools [nrepl-client-map]
+  (get-config nrepl-client-map :disable-tools))
+
+(defn tool-id-enabled?
+  "Check if a tool should be enabled based on :enable-tools and :disable-tools config.
+   
+   Logic:
+   - If :enable-tools is nil, all tools are enabled (unless in :disable-tools)
+   - If :enable-tools is [], no tools are enabled
+   - If :enable-tools is provided, only those tools are enabled
+   - :disable-tools is then applied to remove tools from the enabled set
+   
+   Both config lists can contain strings or keywords - they are normalized to keywords."
+  [nrepl-client-map tool-id]
+  (let [enable-tools (get-enable-tools nrepl-client-map)
+        disable-tools (get-disable-tools nrepl-client-map)
+        ;; Normalize tool-id to keyword
+        tool-id (keyword tool-id)
+        enable-set (when enable-tools (set (map keyword enable-tools)))
+        disable-set (when disable-tools (set (map keyword disable-tools)))]
+    (cond
+      ;; If enable is empty list [], nothing is enabled
+      (and (some? enable-tools) (empty? enable-tools)) false
+
+      ;; If enable is nil, all are enabled (unless in disable list)
+      (nil? enable-tools) (not (contains? disable-set tool-id))
+
+      ;; If enable is provided, check if tool is in enable list AND not in disable list
+      :else (and (contains? enable-set tool-id)
+                 (not (contains? disable-set tool-id))))))
+
+(defn get-enable-prompts [nrepl-client-map]
+  (get-config nrepl-client-map :enable-prompts))
+
+(defn get-disable-prompts [nrepl-client-map]
+  (get-config nrepl-client-map :disable-prompts))
+
+(defn prompt-name-enabled?
+  "Check if a prompt should be enabled based on :enable-prompts and :disable-prompts config.
+   
+   Logic:
+   - If :enable-prompts is nil, all prompts are enabled (unless in :disable-prompts)
+   - If :enable-prompts is [], no prompts are enabled
+   - If :enable-prompts is provided, only those prompts are enabled
+   - :disable-prompts is then applied to remove prompts from the enabled set
+   
+   Prompt names are converted to keywords for comparison.
+   Both config lists can contain strings or keywords."
+  [nrepl-client-map prompt-name]
+  (let [enable-prompts (get-enable-prompts nrepl-client-map)
+        disable-prompts (get-disable-prompts nrepl-client-map)
+        enable-set (when enable-prompts (set enable-prompts))
+        disable-set (when disable-prompts (set disable-prompts))]
+    (cond
+      ;; If enable is empty list [], nothing is enabled
+      (and (some? enable-prompts) (empty? enable-prompts)) false
+
+      ;; If enable is nil, all are enabled (unless in disable list)
+      (nil? enable-prompts) (not (contains? disable-set prompt-name))
+
+      ;; If enable is provided, check if prompt is in enable list AND not in disable list
+      :else (and (contains? enable-set prompt-name)
+                 (not (contains? disable-set prompt-name))))))
+
+(defn get-enable-resources [nrepl-client-map]
+  (get-config nrepl-client-map :enable-resources))
+
+(defn get-disable-resources [nrepl-client-map]
+  (get-config nrepl-client-map :disable-resources))
+
+(defn resource-name-enabled?
+  "Check if a resource should be enabled based on :enable-resources and :disable-resources config.
+   
+   Logic:
+   - If :enable-resources is nil, all resources are enabled (unless in :disable-resources)
+   - If :enable-resources is [], no resources are enabled
+   - If :enable-resources is provided, only those resources are enabled
+   - :disable-resources is then applied to remove resources from the enabled set
+   
+   Resource names are used as strings for comparison.
+   Both config lists should contain strings."
+  [nrepl-client-map resource-name]
+  (let [enable-resources (get-enable-resources nrepl-client-map)
+        disable-resources (get-disable-resources nrepl-client-map)
+        enable-set (when enable-resources (set enable-resources))
+        disable-set (when disable-resources (set disable-resources))]
+    (cond
+      ;; If enable is empty list [], nothing is enabled
+      (and (some? enable-resources) (empty? enable-resources)) false
+
+      ;; If enable is nil, all are enabled (unless in disable list)
+      (nil? enable-resources) (not (contains? disable-set resource-name))
+
+      ;; If enable is provided, check if resource is in enable list AND not in disable list
+      :else (and (contains? enable-set resource-name)
+                 (not (contains? disable-set resource-name))))))
+
+(defn get-resources
+  "Get the resources configuration map from config"
+  [nrepl-client-map]
+  (get-config nrepl-client-map :resources))
+
+(defn get-prompts
+  "Get the prompts configuration map from config"
+  [nrepl-client-map]
+  (get-config nrepl-client-map :prompts))
 
 (defn set-config*
   "Sets a config value in a map. Returns the updated map.

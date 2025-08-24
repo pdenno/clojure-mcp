@@ -8,6 +8,9 @@
             [clojure.tools.logging :as log]
             [clojure-mcp.nrepl :as nrepl]))
 
+(defn handle-bash-over-nrepl? [nrepl-env-type]
+  (boolean (#{:clj :bb} nrepl-env-type)))
+
 ;; Multimethod for getting the expression to fetch project directory
 (defmulti fetch-project-directory-exp
   "Returns an expression (string) to evaluate for getting the project directory.
@@ -17,6 +20,14 @@
 (defmethod fetch-project-directory-exp :clj
   [_]
   "(System/getProperty \"user.dir\")")
+
+(defmethod fetch-project-directory-exp :bb
+  [_]
+  "(System/getProperty \"user.dir\")")
+
+(defmethod fetch-project-directory-exp :basilisp
+  [_]
+  "(import os)\n(os/getcwd)")
 
 (defmethod fetch-project-directory-exp :default
   [_]
@@ -30,8 +41,16 @@
 
 (defmethod initialize-environment-exp :clj
   [_]
-  ["(require 'clojure.repl)"
+  ["(require '[clojure.repl :as repl])"
    "(require 'nrepl.util.print)"])
+
+(defmethod initialize-environment-exp :bb
+  [_]
+  ["(require '[clojure.repl :as repl])"])
+
+(defmethod initialize-environment-exp :basilisp
+  [_]
+  ["(require '[basilisp.repl :as repl])"])
 
 (defmethod initialize-environment-exp :default
   [_]
@@ -53,7 +72,21 @@
   [_]
   [])
 
-;; High-level wrapper functions that execute the expressions
+(defmulti fetch-project-directory-helper (fn [nrepl-env-type _] nrepl-env-type))
+
+(defmethod fetch-project-directory-helper :default [nrepl-env-type nrepl-client-map]
+  ;; default to fetching from the nrepl
+  (when-let [exp (fetch-project-directory-exp nrepl-env-type)]
+    (try
+      (edn/read-string
+       (nrepl/tool-eval-code nrepl-client-map exp))
+      (catch Exception e
+        (log/warn e "Failed to fetch project directory")
+        nil))))
+
+(defmethod fetch-project-directory-helper :scittle [_ nrepl-client-map]
+  (when-let [desc (nrepl/describe nrepl-client-map)]
+    (some-> desc :aux :cwd io/file (.getCanonicalPath))))
 
 (defn fetch-project-directory
   "Fetches the project directory for the given nREPL client.
@@ -62,13 +95,9 @@
   [nrepl-client-map nrepl-env-type project-dir]
   (if project-dir
     (.getCanonicalPath (io/file project-dir))
-    (when-let [exp (fetch-project-directory-exp nrepl-env-type)]
-      (try
-        (edn/read-string
-         (nrepl/tool-eval-code nrepl-client-map exp))
-        (catch Exception e
-          (log/warn e "Failed to fetch project directory")
-          nil)))))
+    (fetch-project-directory-helper nrepl-env-type nrepl-client-map)))
+
+;; High-level wrapper functions that execute the expressions
 
 (defn initialize-environment
   "Initializes the environment by evaluating dialect-specific expressions.
@@ -88,14 +117,17 @@
       (nrepl/tool-eval-code nrepl-client-map exp)))
   nrepl-client-map)
 
+(defn detect-nrepl-env-type [nrepl-client-map]
+  (when-let [{:keys [versions]} (nrepl/describe nrepl-client-map)]
+    (cond
+      (get versions :clojure) :clj
+      (get versions :babashka) :bb
+      (get versions :basilisp) :basilisp
+      (get versions :sci-nrepl) :scittle
+      :else :unknown)))
+
 ;; Future dialect support placeholders
 (comment
-  ;; Babashka might have different initialization
-  (defmethod initialize-environment-exp :bb
-    [_]
-    ["(require '[babashka.fs :as fs])"
-     "(require '[clojure.repl])"])
-
   ;; ClojureScript on Node
   (defmethod fetch-project-directory-exp :cljs-node
     [_]
@@ -104,9 +136,4 @@
   ;; Jank might have C++ interop
   (defmethod fetch-project-directory-exp :jank
     [_]
-    "(jank.native/cwd)")
-
-  ;; Basilisp (Python-based)
-  (defmethod fetch-project-directory-exp :basilisp
-    [_]
-    "(python/os.getcwd)"))
+    "(jank.native/cwd)"))

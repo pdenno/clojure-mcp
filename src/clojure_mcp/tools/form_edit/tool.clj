@@ -12,6 +12,7 @@
    [clojure-mcp.utils.valid-paths :as valid-paths]
    [clojure-mcp.config :as config]
    [clojure.string :as str]
+   [clojure.java.io :as io]
    [rewrite-clj.parser :as p]
    [rewrite-clj.node :as n]))
 
@@ -500,85 +501,82 @@ For reliable results, use a unique substring that appears in only one comment bl
 (defn comment-block-edit-tool [nrepl-client-atom]
   (tool-system/registration-map (create-edit-comment-block-tool nrepl-client-atom)))
 
-(defn create-edit-replace-sexp-tool
-  "Creates the tool configuration for replacing s-expressions in a file.
+(defn create-update-sexp-tool
+  "Creates the tool configuration for updating s-expressions in a file.
    Automatically inherits emacs notification preferences from the client."
   [nrepl-client-atom]
   (let [client @nrepl-client-atom
         emacs-notify (config/get-emacs-notify client)]
-    {:tool-type :clojure-edit-replace-sexp
+    {:tool-type :clojure-update-sexp
      :nrepl-client-atom nrepl-client-atom
-     :enable-emacs-notifications emacs-notify}))
+     :enable-emacs-notifications emacs-notify
+     :multi-op false}))
 
-(defmethod tool-system/tool-name :clojure-edit-replace-sexp [_]
-  "clojure_edit_replace_sexp")
+(defmethod tool-system/tool-name :clojure-update-sexp [{:keys [multi-op]}]
+  (if multi-op "clojure_update_sexp" "clojure_edit_replace_sexp"))
 
-(defmethod tool-system/tool-description :clojure-edit-replace-sexp [_]
-  "Edits a file by finding and replacing specific s-expressions.
+(defmethod tool-system/tool-description :clojure-update-sexp [{:keys [multi-op]}]
+  (slurp
+   (io/resource
+    (if multi-op
+      "clojure-mcp/tools/form_edit/clojure_update_sexp-description.md"
+      "clojure-mcp/tools/form_edit/clojure_edit_replace_sexp-description.md"))))
 
-Use this tool for targeted edits of sub-expressions within forms. For complete top-level form replacements, prefer specialized tools like `clojure_edit_replace_definition` and friends.
-
-KEY BENEFITS:
-- Syntax-aware matching that understands Clojure code structure
-- Ignores whitespace differences by default, focusing on actual code meaning
-- Matches expressions regardless of formatting, indentation, or spacing
-- Prevents errors from mismatched text or irrelevant formatting differences
-- Can find and replace all occurrences with replace_all: true
-
-CONSTRAINTS:
-- match_form must contain only a SINGLE s-expression (error otherwise)
-- Requires syntactically valid Clojure expressions in both match_form and new_form
-
-WARNING: You will receive errors if the syntax is wrong. The most common error is an extra or missing parenthesis in either match_form or new_form, so count your parentheses carefully!
-
-COMMON APPLICATIONS:
-- Renaming symbols throughout the file: {\"match_form\": \"old-name\", \"new_form\": \"new-name\", \"replace_all\": true}
-- Editing special forms like if/cond/let/when within functions:
-  * Changing if branches: {\"match_form\": \"(if condition expr1 expr2)\", \"new_form\": \"(if condition (do expr1) expr2)\"}
-  * Enhancing let bindings: {\"match_form\": \"(let [x 10] (+ x 2))\", \"new_form\": \"(let [x 10 y 20] (+ x y))\"}
-  * Converting cond to case: {\"match_form\": \"(cond (= x :a) \\\"A\\\" (= x :b) \\\"B\\\")\", \"new_form\": \"(case x :a \\\"A\\\" :b \\\"B\\\")\"}
-- Modifying nested function calls: {\"match_form\": \"(str (+ a b))\", \"new_form\": \"(str (+ a b c))\"}
-- Changing anonymous function syntax: {\"match_form\": \"#(update % :count inc)\", \"new_form\": \"(fn [x] (update x :count inc))\"}
-
-Other Examples:
-- Replace a calculation: {\"match_form\": \"(+ x 2)\", \"new_form\": \"(+ x 10)\"}
-  * Will match regardless of spaces: (+ x 2), (+   x   2), etc.
-- Delete an expression: {\"match_form\": \"(println debug-info)\", \"new_form\": \"\"}
-- Edit anonymous function: {\"match_form\": \"#(inc %)\", \"new_form\": \"#(+ % 2)\"}
-- Replace multiple occurrences: {\"match_form\": \"(inc x)\", \"new_form\": \"(+ x 1)\", \"replace_all\": true}
-
-Returns a diff showing the changes made to the file.")
-
-(defmethod tool-system/tool-schema :clojure-edit-replace-sexp [_]
+(defmethod tool-system/tool-schema :clojure-update-sexp [{:keys [multi-op]}]
   {:type :object
-   :properties {:file_path {:type :string
-                            :description "Path to the file to edit"}
-                :match_form {:type :string
-                             :description "The s-expression to find and replace (include # for anonymous functions)"}
-                :new_form {:type :string
-                           :description "The s-expression to replace with"}
-                :replace_all {:type :boolean
-                              :description "Whether to replace all occurrences (default: false)"}}
-   :required [:file_path :match_form :new_form]})
+   :properties
+   (cond-> {:file_path {:type :string
+                        :description "Path to the file to edit"}
+            :match_form {:type :string
+                         :description "The s-expression to find (include # for anonymous functions)"}
+            :new_form {:type :string
+                       :description "The s-expression to use for the operation"}
+            :replace_all {:type :boolean
+                          :description
+                          (format "Whether to %s all occurrences (default: false)"
+                                  (if multi-op "apply operation to" "replace"))}}
+     multi-op
+     (assoc :operation {:type :string
+                        :enum ["replace" "insert_before" "insert_after"]
+                        :description "The editing operation to perform"}))
+   :required (cond-> [:file_path :match_form :new_form]
+               multi-op (conj :operation))})
 
-(defmethod tool-system/validate-inputs :clojure-edit-replace-sexp [{:keys [nrepl-client-atom]} inputs]
+(defmethod tool-system/validate-inputs :clojure-update-sexp
+  [{:keys [nrepl-client-atom multi-op]} inputs]
   (let [file-path (validate-file-path inputs nrepl-client-atom)
-        {:keys [match_form new_form replace_all whitespace_sensitive]} inputs]
+        {:keys [match_form new_form operation replace_all whitespace_sensitive]} inputs]
     (when-not match_form
       (throw (ex-info "Missing required parameter: match_form"
                       {:inputs inputs})))
     (when-not new_form
       (throw (ex-info "Missing required parameter: new_form"
                       {:inputs inputs})))
+    (when (and multi-op
+               (nil? operation))
+      (throw (ex-info "Missing required parameter: operation"
+                      {:inputs inputs})))
+    (when (and multi-op
+               operation
+               (not (contains? #{"replace" "insert_before" "insert_after"} operation)))
+      (throw (ex-info (str "Invalid operation: " operation
+                           ". Supported operations: replace, insert_before, insert_after")
+                      {:inputs inputs})))
 
     (when (str/blank? match_form)
       (throw (ex-info "Bad parameter: match-form can not be a blank string."
                       {:inputs inputs})))
+
+    ;; TODO we can get more sophisticated here...  we are handling
+    ;; code repairs deeper inside the actually tools evaluation and
+    ;; this prevents it.  Also I think we can actually do comment
+    ;; replacement now but we might need special handling for that.
+
     ;; Special handling for empty string
     (when-not (str/blank? match_form)
       (try
         (let [parsed (p/parse-string-all match_form)]
-          ;; Check if there's at least one non-whitespace, non-comment node
+            ;; Check if there's at least one non-whitespace, non-comment node
           (when (zero? (count (n/child-sexprs parsed)))
             (throw (ex-info "match_form must contain at least one S-expression (not just comments or whitespace)"
                             {:inputs inputs}))))
@@ -599,17 +597,27 @@ Returns a diff showing the changes made to the file.")
     {:file_path file-path
      :match_form match_form
      :new_form new_form
-     :replace_all (boolean (or replace_all false))
+     :operation operation
+     :replace_all (boolean (if (#{"insert_before" "insert_after"} operation)
+                             false
+                             (or replace_all false)))
      :whitespace_sensitive (boolean (or whitespace_sensitive false))}))
 
-(defmethod tool-system/execute-tool :clojure-edit-replace-sexp [{:keys [nrepl-client-atom] :as tool} inputs]
-  (let [{:keys [file_path match_form new_form replace_all whitespace_sensitive]} inputs
-        result (pipeline/sexp-replace-pipeline
-                file_path match_form new_form replace_all whitespace_sensitive tool)
+(defmethod tool-system/execute-tool :clojure-update-sexp [{:keys [multi-op nrepl-client-atom] :as tool} inputs]
+  (let [{:keys [file_path match_form new_form operation replace_all whitespace_sensitive]} inputs
+        ;; Convert operation string to keyword for the pipeline
+        operation-kw (if-not multi-op
+                       :replace
+                       (condp = operation
+                         "replace" :replace
+                         "insert_before" :insert-before
+                         "insert_after" :insert-after))
+        result (pipeline/sexp-edit-pipeline
+                file_path match_form new_form operation-kw replace_all whitespace_sensitive tool)
         formatted-result (pipeline/format-result result)]
     formatted-result))
 
-(defmethod tool-system/format-results :clojure-edit-replace-sexp [_ {:keys [error message diff]}]
+(defmethod tool-system/format-results :clojure-update-sexp [_ {:keys [error message diff]}]
   (if error
     {:result [message]
      :error true}
@@ -617,8 +625,8 @@ Returns a diff showing the changes made to the file.")
      :error false}))
 
 ;; Function to register the tool
-(defn sexp-replace-tool [nrepl-client-atom]
-  (tool-system/registration-map (create-edit-replace-sexp-tool nrepl-client-atom)))
+(defn sexp-update-tool [nrepl-client-atom]
+  (tool-system/registration-map (create-update-sexp-tool nrepl-client-atom)))
 
 (comment
   ;; === Examples of using the form editing tools ===
@@ -635,8 +643,8 @@ Returns a diff showing the changes made to the file.")
   (def insert-after-tool (create-edit-insert-after-form-tool client-atom))
   (def docstring-tool (create-edit-docstring-tool client-atom))
   (def comment-tool (create-edit-comment-block-tool client-atom))
-  (def outline-tool (create-file-structure-tool client-atom))
-  (def sexp-tool (create-edit-replace-sexp-tool client-atom))
+
+  (def sexp-tool (create-update-sexp-tool client-atom))
 
   ;; Test the replace form tool
   (def replace-inputs
@@ -700,7 +708,6 @@ Returns a diff showing the changes made to the file.")
   ;; Test various tools
   (test-tool replace-tool replace-inputs)
   (test-tool comment-tool comment-inputs)
-  (test-tool outline-tool {:file_path "/tmp/test.clj"})
   (test-tool sexp-tool sexp-inputs)
   (test-tool sexp-tool anon-fn-inputs)
   (test-tool sexp-tool empty-str-inputs)

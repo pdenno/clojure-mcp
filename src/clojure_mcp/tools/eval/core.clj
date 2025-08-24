@@ -48,13 +48,13 @@
    - nrepl-client: The nREPL client to use for evaluation
    - opts: A map of options:
      - :code The Clojure code to evaluate as a string
-     - :ns Optional namespace to evaluate in. If nil, uses current namespace.
+     - :timeout_ms the timeout in milliseconds
    
    Returns:
    - A map with :outputs (raw outputs), :error (boolean flag)"
   [nrepl-client opts]
-  (let [{:keys [code ns timeout-ms session]} opts
-        timeout-ms (or timeout-ms 20000)
+  (let [{:keys [code timeout_ms session]} opts
+        timeout-ms (or timeout_ms 20000)
         outputs (atom [])
         error-occurred (atom false)
         form-str code
@@ -129,7 +129,6 @@
    - nrepl-client: The nREPL client to use for evaluation
    - opts: A map of options:
      - :code The Clojure code to evaluate as a string
-     - :ns Optional namespace to evaluate in. If nil, uses current namespace.
      - :session Optional session
    Returns:
    - A map with :outputs (raw outputs), :error (boolean flag), :repaired (boolean flag)"
